@@ -17,6 +17,17 @@ function bg(kind, w, h) {
       ${Array.from({ length: 12 }, (_, i) => `<circle cx="${(i + 0.5) * w / 12}" cy="${h * 0.38 + (i % 2) * 8}" r="7" fill="${["#e25a5a", "#5a8ee2", "#e2c25a", "#7ad17a"][i % 4]}" opacity=".5"/>`).join("")}`],
     desert: ["#ffb36b", "#ffe4a8", `<circle cx="${w * 0.8}" cy="${h * 0.2}" r="${w * 0.08}" fill="#fff4c2"/><path d="M0 ${h * 0.7} Q${w * 0.3} ${h * 0.6} ${w * 0.6} ${h * 0.68} T${w} ${h * 0.64} V${h} H0Z" fill="#e2c07a"/>
       <rect x="${w * 0.12}" y="${h * 0.45}" width="8" height="${h * 0.24}" rx="4" fill="#3e8f4a" opacity=".7"/>`],
+    forest: ["#3d5a7a", "#9cc9a0", `<circle cx="${w * 0.82}" cy="${h * 0.16}" r="${w * 0.06}" fill="#ffe9b0" opacity=".8"/>
+      ${Array.from({ length: 6 }, (_, i) => { const x = (i + 0.3) * w / 6, t = h * (0.3 + (i % 2) * 0.08);
+        return `<path d="M${x - w * 0.09} ${h * 0.74} L${x} ${t} L${x + w * 0.09} ${h * 0.74}Z" fill="${i % 2 ? "#2f6b44" : "#285c3a"}" opacity=".75"/>`; }).join("")}
+      <rect y="${h * 0.72}" width="${w}" height="${h}" fill="#5f8f4e"/><rect y="${h * 0.72}" width="${w}" height="4" fill="#4f7d40"/>`],
+    home: ["#f5e6cf", "#efd9b8", `<rect x="${w * 0.1}" y="${h * 0.14}" width="${w * 0.3}" height="${h * 0.26}" rx="4" fill="#a8d8f0" stroke="#fff" stroke-width="5"/>
+      <rect x="${w * 0.1}" y="${h * 0.14}" width="${w * 0.3}" height="${h * 0.26}" rx="4" fill="none" stroke="#c9a57a" stroke-width="2"/>
+      <path d="M${w * 0.25} ${h * 0.14} V${h * 0.4} M${w * 0.1} ${h * 0.27} H${w * 0.4}" stroke="#fff" stroke-width="4"/>
+      <rect y="${h * 0.72}" width="${w}" height="${h}" fill="#c9965e"/>${Array.from({ length: 8 }, (_, i) => `<rect x="${i * w / 8}" y="${h * 0.72}" width="2" height="${h}" fill="#b07f4a"/>`).join("")}`],
+    cave: ["#1b2a4a", "#2d4a7a", `${Array.from({ length: 9 }, (_, i) => { const x = (i + 0.5) * w / 9, y = h * (0.12 + ((i * 37) % 50) / 100);
+        return `<path d="M${x} ${y - 12} L${x + 7} ${y} L${x} ${y + 12} L${x - 7} ${y}Z" fill="#8fd8ff" opacity=".55"/>`; }).join("")}
+      <rect y="${h * 0.74}" width="${w}" height="${h}" fill="#26375c"/>`],
   };
   const [top, bottom, deco] = sets[kind];
   return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient></defs>
@@ -31,6 +42,7 @@ function person(o) {
   const aw = { buff: 22, thin: 12, normal: 15, coat: 16 }[o.build];      // толщина руки
   const lx = 100 - sw - aw + 5, rx = 100 + sw - 5;
   let s = `<ellipse cx="100" cy="258" rx="${sw + 22}" ry="9" fill="#000" opacity=".18"/>`;
+  if (o.backHair) s += o.backHair();
 
   // ноги
   if (o.robe) {
@@ -223,3 +235,99 @@ const CHAR = {
     mouth: `<ellipse cx="100" cy="111" rx="7" ry="6" fill="#8a2a2a" stroke="${OUT}" stroke-width="2.5"/>` },
   player: { skin: "#f0c8a0", shirt: "#2e9e6b", pants: "#3a3a48", shoes: "#6b4a2b", build: "normal", hair: hairMessy("#5a3620"), iris: "#3a6a3a", logo: "🎒" },
 };
+
+// ---------- Книга 2 ----------
+const hairLong = (c) => () =>
+  `<path d="M56 84 Q52 34 100 33 Q148 34 144 84 Q140 60 112 54 Q96 70 60 86Z" fill="${c}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
+   <path d="M74 44 Q96 34 118 42" stroke="#fff" stroke-width="3" opacity=".25" fill="none"/>`;
+const hairLongBack = (c) => () =>
+  `<path d="M54 76 Q44 150 62 176 Q100 186 138 176 Q156 150 146 76Z" fill="${c}" stroke="${OUT}" stroke-width="3"/>`;
+const hairBun = (c) => () =>
+  `<circle cx="100" cy="30" r="17" fill="${c}" stroke="${OUT}" stroke-width="3"/>
+   <path d="M56 82 Q54 36 100 36 Q146 36 144 82 Q134 56 100 54 Q66 56 56 82Z" fill="${c}" stroke="${OUT}" stroke-width="3"/>`;
+const flashlight = `<g transform="translate(138 200) rotate(-25)"><path d="M-10 -36 L-38 -96 L38 -96 L10 -36Z" fill="#fff6b0" opacity=".5"/>
+  <rect x="-7" y="-30" width="14" height="34" rx="3" fill="#3a3a44" stroke="${OUT}" stroke-width="2.5"/><rect x="-10" y="-40" width="20" height="12" rx="3" fill="#6a6a78" stroke="${OUT}" stroke-width="2.5"/>
+  <rect x="-7" y="-40" width="14" height="4" fill="#fff6b0"/></g>`;
+const iceCream = (x, y) => `<g transform="translate(${x} ${y})"><path d="M-11 -4 L0 26 L11 -4Z" fill="#e2a55a" stroke="${OUT}" stroke-width="2.5" stroke-linejoin="round"/>
+  <path d="M-6 2 L4 12 M0 -2 L7 5" stroke="#b97a35" stroke-width="2"/>
+  <circle cx="0" cy="-10" r="11" fill="#ff9ec4" stroke="${OUT}" stroke-width="2.5"/><circle cx="-4" cy="-22" r="9" fill="#fff4d6" stroke="${OUT}" stroke-width="2.5"/>
+  <circle cx="-7" cy="-25" r="2.5" fill="#fff"/><circle cx="3" cy="-8" r="1.5" fill="#e2553f"/><circle cx="-3" cy="-4" r="1.5" fill="#4fa3e0"/></g>`;
+const pelmeniBowl = (x, y) => `<g transform="translate(${x} ${y})">
+  <path d="M-10 -8 q5 -10 10 0 q-5 4 -10 0Z M0 -10 q5 -10 10 0 q-5 4 -10 0Z M-18 -6 q5 -10 10 0 q-5 4 -10 0Z M8 -6 q5 -10 10 0 q-5 4 -10 0Z" fill="#fff4dc" stroke="${OUT}" stroke-width="2"/>
+  <path d="M-24 -6 H24 Q22 18 0 18 Q-22 18 -24 -6Z" fill="#4fa3e0" stroke="${OUT}" stroke-width="2.5"/><path d="M-20 0 H20" stroke="#fff" stroke-width="2" opacity=".6"/>
+  <path d="M-6 -18 q-3 -6 0 -10 M4 -18 q-3 -6 0 -10" stroke="#fff" stroke-width="2" opacity=".7" fill="none"/></g>`;
+const fryingPan = `<g transform="translate(150 196) rotate(20)"><rect x="-4" y="-50" width="8" height="36" rx="3" fill="#6b4a2b" stroke="${OUT}" stroke-width="2.5"/>
+  <ellipse cx="0" cy="0" rx="26" ry="18" fill="#3a3a44" stroke="${OUT}" stroke-width="3"/><ellipse cx="0" cy="-2" rx="18" ry="11" fill="#555"/>
+  <ellipse cx="-4" cy="-3" rx="8" ry="6" fill="#fff"/><circle cx="-3" cy="-3" r="3.5" fill="#ffc83a"/></g>`;
+const apron = `<path d="M78 150 H122 L128 214 H72Z" fill="#fff" stroke="${OUT}" stroke-width="2.5" stroke-linejoin="round"/>
+  <rect x="88" y="170" width="24" height="14" rx="3" fill="#ffd1e6" stroke="${OUT}" stroke-width="2"/>`;
+
+function kitten(x0, weirdEar) {
+  const W_ = "#fbfbff", SH = "#dfe2ee";
+  return `<g transform="translate(${x0} 0)">
+    <ellipse cx="100" cy="150" rx="62" ry="8" fill="#000" opacity=".18"/>
+    <path d="M150 128 Q186 118 176 78" stroke="${OUT}" stroke-width="13" fill="none" stroke-linecap="round"/><path d="M150 128 Q186 118 176 78" stroke="${W_}" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <ellipse cx="118" cy="120" rx="44" ry="30" fill="${W_}" stroke="${OUT}" stroke-width="3"/>
+    <ellipse cx="96" cy="142" rx="10" ry="8" fill="${W_}" stroke="${OUT}" stroke-width="2.5"/><ellipse cx="140" cy="142" rx="10" ry="8" fill="${W_}" stroke="${OUT}" stroke-width="2.5"/>
+    <path d="M54 58 L60 18 L84 44Z" fill="${W_}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/><path d="M60 50 L62 30 L76 44Z" fill="#ffb3c7"/>
+    ${weirdEar
+      ? `<path d="M110 44 L136 34 L128 56Z" fill="${W_}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/><path d="M118 36 l6 6 m-2 -8 l6 6" stroke="${OUT}" stroke-width="2"/>`
+      : `<path d="M110 44 L128 14 L136 56Z" fill="${W_}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/><path d="M116 46 L126 26 L130 50Z" fill="#ffb3c7"/>`}
+    <circle cx="94" cy="76" r="40" fill="${W_}" stroke="${OUT}" stroke-width="3"/>
+    <path d="M118 52 A40 40 0 0 1 118 102 A44 44 0 0 0 118 52Z" fill="${SH}"/>
+    <ellipse cx="80" cy="76" rx="7" ry="9" fill="#2f5d9a"/><ellipse cx="108" cy="76" rx="7" ry="9" fill="#2f5d9a"/>
+    <circle cx="82" cy="73" r="2.5" fill="#fff"/><circle cx="110" cy="73" r="2.5" fill="#fff"/>
+    <path d="M90 88 L98 88 L94 93Z" fill="#ff8aa8"/><path d="M94 93 q-5 6 -10 2 M94 93 q5 6 10 2" stroke="${OUT}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M66 88 l-20 -3 M66 93 l-20 3 M122 88 l20 -3 M122 93 l20 3" stroke="${OUT}" stroke-width="1.8"/>
+    <ellipse cx="70" cy="90" rx="6" ry="3.5" fill="#ffb3c7" opacity=".6"/><ellipse cx="118" cy="90" rx="6" ry="3.5" fill="#ffb3c7" opacity=".6"/></g>`;
+}
+
+function blueMonster() {
+  let crystals = "";
+  const pts = [[70, 150], [110, 120], [150, 160], [90, 196], [140, 206], [60, 210], [168, 120]];
+  pts.forEach(([x, y], i) => { crystals += `<path d="M${x} ${y - 16} L${x + 10} ${y} L${x} ${y + 16} L${x - 10} ${y}Z" fill="${i % 2 ? "#8fd8ff" : "#b8e8ff"}" stroke="#2a5d9a" stroke-width="2" opacity=".9"/>`; });
+  return `<ellipse cx="120" cy="252" rx="100" ry="10" fill="#000" opacity=".2"/>
+    <rect x="70" y="200" width="36" height="50" rx="16" fill="#3a7fd0" stroke="${OUT}" stroke-width="3"/><rect x="136" y="200" width="36" height="50" rx="16" fill="#2f6fbf" stroke="${OUT}" stroke-width="3"/>
+    <path d="M40 150 Q10 170 22 214 Q36 222 44 206 Q40 180 60 168Z" fill="#3a7fd0" stroke="${OUT}" stroke-width="3"/>
+    <path d="M200 150 Q232 170 220 214 Q206 222 198 206 Q202 180 182 168Z" fill="#2f6fbf" stroke="${OUT}" stroke-width="3"/>
+    <path d="M44 110 Q40 40 120 36 Q200 40 196 110 L190 214 Q120 232 50 214Z" fill="#4a90e2" stroke="${OUT}" stroke-width="3"/>
+    <path d="M160 44 Q200 60 196 110 L190 214 Q176 218 164 220 Q180 140 160 44Z" fill="#2f6fbf" opacity=".6"/>
+    ${crystals}
+    <path d="M62 60 Q70 30 120 30 Q170 30 178 60 Q170 70 166 62 Q162 84 154 66 Q148 58 140 74 Q134 92 126 70 Q118 60 110 78 Q102 96 94 70 Q88 60 80 76 Q72 88 70 66 Q64 70 62 60Z"
+      fill="#c2562a" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M78 42 Q100 34 124 38" stroke="#ffb07a" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <ellipse cx="120" cy="116" rx="34" ry="32" fill="#fff" stroke="${OUT}" stroke-width="3"/>
+    <circle cx="120" cy="118" r="26" fill="#0a0a12"/><circle cx="110" cy="108" r="7" fill="#fff" opacity=".85"/><circle cx="130" cy="126" r="3" fill="#fff" opacity=".5"/>
+    <path d="M92 170 Q120 190 148 170" stroke="${OUT}" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M104 176 l4 8 l4 -7 M128 177 l4 7 l4 -8" fill="#fff" stroke="${OUT}" stroke-width="2"/>`;
+}
+
+function crayfish(x, y, sc, flip) {
+  const R = "#e0452e", RD = "#b8321f";
+  const claw = (cx, cy, r) => `<g transform="translate(${cx} ${cy}) rotate(${r})"><path d="M0 0 Q-6 -24 8 -34 Q18 -26 12 -14 Q22 -18 22 -6 Q10 4 0 0Z" fill="${R}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/></g>`;
+  return `<g transform="translate(${x} ${y}) scale(${flip ? -sc : sc} ${sc})">
+    <ellipse cx="0" cy="34" rx="70" ry="7" fill="#000" opacity=".18"/>
+    <path d="M-30 10 L-44 -30 M-20 12 L-40 -34" stroke="${OUT}" stroke-width="2.5" fill="none"/>
+    <path d="M-8 20 l-10 14 M4 22 l-6 14 M16 22 l0 14 M28 20 l6 14" stroke="${RD}" stroke-width="4" stroke-linecap="round"/>
+    ${claw(-26, 8, -30)}${claw(-18, 14, 10)}
+    <path d="M62 14 L82 2 L84 30Z" fill="${R}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="46" cy="16" rx="18" ry="12" fill="${R}" stroke="${OUT}" stroke-width="3"/>
+    <ellipse cx="22" cy="16" rx="16" ry="14" fill="${R}" stroke="${OUT}" stroke-width="3"/>
+    <ellipse cx="-8" cy="12" rx="26" ry="18" fill="${R}" stroke="${OUT}" stroke-width="3"/>
+    <path d="M30 6 v20 M48 8 v16" stroke="${RD}" stroke-width="3"/>
+    <ellipse cx="-14" cy="4" rx="10" ry="5" fill="#fff" opacity=".3"/>
+    <circle cx="-26" cy="2" r="5" fill="#fff" stroke="${OUT}" stroke-width="2"/><circle cx="-27" cy="2" r="2.5" fill="#000"/>
+    <path d="M-32 18 q4 4 8 0" stroke="${OUT}" stroke-width="2" fill="none" stroke-linecap="round"/></g>`;
+}
+
+Object.assign(CHAR, {
+  romomeo: { ...CHAR.roma, shirt: "#3f8f5a", stripe: "#f2c14e", logo: "🧭" },
+  omeshkin: { skin: "#f1c9a5", shirt: "#ff7ab0", pants: "#4a5a8a", shoes: "#ffffff", build: "normal", hair: hairMessy("#3a2618"), iris: "#5a3a1a", logo: "🍬" },
+  pelmeshkin: { skin: "#e9b98f", shirt: "#f2c14e", pants: "#6b4a2b", shoes: "#3a3a44", build: "normal", hair: hairCurly("#d9a441"), iris: "#3a6a3a", logo: "🥟",
+    brows: "M74 70 q9 -7 19 0 M107 70 q10 -7 19 0" },
+  amira: { skin: "#f3cfb0", shirt: "#9b6fd6", trim: "#ffcf6b", build: "thin", robe: true, hair: hairLong("#2a1a12"), backHair: hairLongBack("#2a1a12"), iris: "#4a2c16", blush: 0.45,
+    mouth: `<path d="M90 108 Q100 116 110 108" stroke="${OUT}" stroke-width="3" fill="none" stroke-linecap="round"/>` },
+  mama: { skin: "#f0c8a4", shirt: "#4f9d8f", trim: "#2f6f63", build: "normal", robe: true, hair: hairBun("#4a2a1a"), iris: "#4a2c16", blush: 0.4, extra: apron,
+    brows: "M74 70 q9 -8 19 -2 M107 68 q10 -6 19 2",
+    mouth: `<path d="M90 110 Q100 104 110 110" stroke="${OUT}" stroke-width="3" fill="none" stroke-linecap="round"/>` },
+});
