@@ -287,7 +287,7 @@ function kitten(x0, weirdEar) {
     <ellipse cx="70" cy="90" rx="6" ry="3.5" fill="#ffb3c7" opacity=".6"/><ellipse cx="118" cy="90" rx="6" ry="3.5" fill="#ffb3c7" opacity=".6"/></g>`;
 }
 
-function blueMonster() {
+function blueMonster(sleeping) {
   let crystals = "";
   const pts = [[70, 150], [110, 120], [150, 160], [90, 196], [140, 206], [60, 210], [168, 120]];
   pts.forEach(([x, y], i) => { crystals += `<path d="M${x} ${y - 16} L${x + 10} ${y} L${x} ${y + 16} L${x - 10} ${y}Z" fill="${i % 2 ? "#8fd8ff" : "#b8e8ff"}" stroke="#2a5d9a" stroke-width="2" opacity=".9"/>`; });
@@ -301,8 +301,10 @@ function blueMonster() {
     <path d="M62 60 Q70 30 120 30 Q170 30 178 60 Q170 70 166 62 Q162 84 154 66 Q148 58 140 74 Q134 92 126 70 Q118 60 110 78 Q102 96 94 70 Q88 60 80 76 Q72 88 70 66 Q64 70 62 60Z"
       fill="#c2562a" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
     <path d="M78 42 Q100 34 124 38" stroke="#ffb07a" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <ellipse cx="120" cy="116" rx="34" ry="32" fill="#fff" stroke="${OUT}" stroke-width="3"/>
-    <circle cx="120" cy="118" r="26" fill="#0a0a12"/><circle cx="110" cy="108" r="7" fill="#fff" opacity=".85"/><circle cx="130" cy="126" r="3" fill="#fff" opacity=".5"/>
+    ${sleeping
+      ? `<path d="M86 118 Q120 140 154 118" stroke="${OUT}" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M96 128 l-4 8 M120 134 v9 M144 128 l4 8" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>`
+      : `<ellipse cx="120" cy="116" rx="34" ry="32" fill="#fff" stroke="${OUT}" stroke-width="3"/>
+    <circle cx="120" cy="118" r="26" fill="#0a0a12"/><circle cx="110" cy="108" r="7" fill="#fff" opacity=".85"/><circle cx="130" cy="126" r="3" fill="#fff" opacity=".5"/>`}
     <path d="M92 170 Q120 190 148 170" stroke="${OUT}" stroke-width="4" fill="none" stroke-linecap="round"/>
     <path d="M104 176 l4 8 l4 -7 M128 177 l4 7 l4 -8" fill="#fff" stroke="${OUT}" stroke-width="2"/>`;
 }

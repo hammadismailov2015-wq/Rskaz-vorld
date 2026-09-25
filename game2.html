@@ -1,0 +1,1063 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Поход в Страшный лес</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Rubik:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #0d1026; --ink: #eef0ff; --accent: #ffcf6b; --panel: rgba(20, 24, 56, .92); --line: #2d3470; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: Rubik, system-ui, -apple-system, "Segoe UI", sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas#game { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; top: 10px; left: 10px; right: 160px; pointer-events: none; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+  #quest, #tasks { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 14px; line-height: 1.35; }
+  #quest b { color: var(--accent); }
+  #tasks { display: none; font-size: 13px; }
+  #tasks .done { opacity: .5; text-decoration: line-through; }
+  #chapter { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; pointer-events: none; opacity: 0; transition: opacity .6s;
+    font-family: Lora, Georgia, serif; color: #fff; text-shadow: 0 0 20px #000, 0 0 40px #000; width: calc(100% - 32px); }
+  #chapter small { display: block; font-family: Rubik, sans-serif; font-size: 16px; letter-spacing: 3px; text-transform: uppercase; color: var(--accent); }
+  #chapter span { font-size: clamp(30px, 7vw, 56px); font-weight: 700; }
+  #mini { position: fixed; top: 10px; right: 10px; width: 132px; height: 84px; border: 2px solid var(--line); border-radius: 8px; image-rendering: pixelated; background: #000; }
+  #back { position: fixed; right: 10px; top: 102px; font-size: 12px; color: #9aa0c8; text-decoration: none; background: var(--panel); padding: 4px 8px; border-radius: 8px; }
+  #dialog { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(680px, calc(100% - 32px)); box-sizing: border-box;
+    background: var(--panel); border: 2px solid var(--accent); border-radius: 16px; padding: 12px 16px; display: none; font-size: 17px; line-height: 1.45; cursor: pointer; }
+  #dialog.show { display: flex; gap: 12px; align-items: flex-start; }
+  #dialog .faces { display: flex; flex-shrink: 0; }
+  #dialog .faces img { width: 64px; height: 64px; }
+  #dialog .faces img + img { margin-left: -18px; }
+  #dialog .body { flex: 1; min-width: 0; }
+  #dialog .who { color: var(--accent); font-weight: 700; margin-bottom: 2px; }
+  #dialog .who.narr { color: #9aa0c8; }
+  #dialog .txt.narr { font-style: italic; }
+  #dialog .next { text-align: right; font-size: 12px; opacity: .6; margin-top: 4px; }
+  #big { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; text-align: center;
+    font-size: clamp(48px, 13vw, 130px); font-weight: 900; color: #fff; opacity: 0; transition: opacity .25s; text-shadow: 0 0 24px #000, 0 0 60px #36f; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; font-size: 15px; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 28, .82); padding: 16px; }
+  .overlay .box { background: #1c2148; border: 1px solid var(--line); border-radius: 20px; padding: 24px; max-width: 460px; text-align: center; }
+  .overlay h1 { color: var(--accent); margin: 0 0 6px; font-family: Lora, Georgia, serif; font-size: 28px; }
+  .overlay p { color: #c8cbef; line-height: 1.5; }
+  .overlay .cast { display: flex; justify-content: center; gap: 4px; margin: 4px 0 8px; }
+  .overlay .cast img { width: 76px; height: 76px; }
+  .overlay button { background: var(--accent); color: #1a1a2e; border: none; border-radius: 999px; padding: 12px 22px; font-size: 17px; font-weight: 700; cursor: pointer; margin: 6px; font-family: inherit; }
+  .overlay button:disabled { opacity: .6; cursor: wait; }
+  .overlay button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  #end { display: none; }
+  @media (max-width: 600px) { #mini { width: 99px; height: 63px; } #back { top: 80px; } #hud { right: 118px; } #quest { font-size: 13px; } #toast { font-size: 13px; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<canvas id="mini" width="110" height="70"></canvas>
+<a id="back" href="index.html">← к миру рассказов</a>
+<div id="hud"><div id="quest"></div><div id="tasks"></div></div>
+<div id="chapter"><small></small><span></span></div>
+<div id="dialog"><div class="faces"></div><div class="body"><div class="who"></div><div class="txt"></div><div class="next">нажми, чтобы продолжить ▶</div></div></div>
+<div id="big"></div>
+<div id="toast"></div>
+<div id="fade"></div>
+
+<div class="overlay" id="start"><div class="box">
+  <h1>Поход в Страшный лес</h1>
+  <p><b>Книга 2. Приключения Омешкина, Пельмешкина и Ромомэо в лесу</b></p>
+  <div class="cast" id="cast"></div>
+  <p>Ты — <b>Ромомэо</b>. Собери рюкзак, проведи операцию «О.М.И.Р.А.» и отведи друзей в лес.</p>
+  <p style="font-size:14px">⌨️ Стрелки или WASD — идти, пробел — дальше<br>📱 Проведи пальцем по экрану — идти, нажми — дальше</p>
+  <button id="play" disabled>Загрузка…</button>
+</div></div>
+
+<div class="overlay" id="end"><div class="box">
+  <h1>КОНЕЦ</h1>
+  <p>После этого герои больше никогда в жизни не могли сидеть на попе.</p>
+  <p style="font-size:14px">Продолжение: «Приключения Омешкина, Пельмешкина и Ромомэо в Москве»</p>
+  <button id="roam">Гулять дальше</button>
+  <button class="ghost" onclick="location.reload()">Сначала</button>
+</div></div>
+
+<script src="art.js"></script>
+<script>
+// ============ Мир ============
+const T = 32, W = 110, H = 70;
+const WATER = 0, GRASS = 1, PATH = 2, SAND = 3, FLOOR = 4, WALL = 5, WIN = 6, FOREST = 7, SHALLOW = 8, HILL = 9;
+const map = new Uint8Array(W * H).fill(GRASS);
+const solidObj = new Uint8Array(W * H);
+const at = (x, y) => y * W + x;
+const get = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? WATER : map[at(x, y)]);
+const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < W && y < H) map[at(x, y)] = t; };
+function rect(x0, y0, x1, y1, t) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, t); }
+let seed = 777;
+const rnd = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const hash = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+
+const HILLC = { x: 49, y: 24, r: 9 };
+const CAMP = { x: 78, y: 30 };
+const CAVE = { x: 102, y: 50 };
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
+  if (edge < 2.5 + Math.sin(x * 0.31) + Math.sin(y * 0.37)) { set(x, y, WATER); continue; }
+  if (x > 57 + 2 * Math.sin(y * 0.3)) set(x, y, FOREST);
+  if (Math.hypot(x - HILLC.x, (y - HILLC.y) * 1.3) < HILLC.r) set(x, y, HILL);
+}
+// речка у дома и лесная речка
+rect(2, 27, 46, 27, SAND); rect(2, 31, 46, 31, SAND); rect(2, 28, 46, 30, SHALLOW);
+for (let y = 3; y < H - 3; y++) { const o = Math.round(Math.sin(y * 0.18) * 1.5); rect(91 + o, y, 91 + o, y, SAND); rect(92 + o, y, 95 + o, y, SHALLOW); rect(96 + o, y, 96 + o, y, SAND); }
+// тропинки
+rect(12, 24, 13, 26, PATH);
+rect(12, 24, 77, 25, PATH);
+rect(76, 24, 77, 31, PATH);
+rect(78, 30, 92, 31, PATH);
+rect(77, 31, 78, 50, PATH);
+rect(77, 49, 99, 50, PATH);
+// дом
+rect(5, 9, 25, 23, WALL); rect(6, 10, 24, 22, FLOOR);
+rect(17, 10, 17, 22, WALL); rect(17, 18, 17, 19, FLOOR);        // стена кухни с проходом
+rect(6, 15, 16, 15, WALL); rect(11, 15, 12, 15, FLOOR);         // стена комнаты Амиры с проходом
+rect(12, 23, 13, 23, PATH);                                      // входная дверь
+rect(8, 23, 9, 23, WIN); rect(20, 23, 21, 23, WIN); rect(9, 9, 10, 9, WIN); rect(25, 13, 25, 14, WIN);
+
+// ============ Предметы ============
+const objs = [];
+function solidRect(x, y, w, h) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solidObj[at(i, j)] = 1; }
+function furn(type, x, y, w, h, o = {}) { objs.push({ type, x: (x + w / 2) * T, y: (y + h) * T, w, h, ...o }); solidRect(x, y, w, h); }
+furn("table", 10, 18, 3, 2);
+furn("sofa", 6, 16, 1, 3);
+furn("stove", 22, 10, 2, 1);
+furn("fridge", 24, 10, 1, 1);
+furn("bed", 6, 10, 2, 3);
+furn("wardrobe", 15, 10, 2, 1);
+objs.push({ type: "rug", x: 11.5 * T, y: 21.5 * T, flat: true });
+objs.push({ type: "log", x: (CAMP.x + 2.5) * T, y: (CAMP.y - 1.4) * T }); solidRect(CAMP.x + 1, CAMP.y - 2, 3, 1);
+objs.push({ type: "sign", x: 15 * T, y: 26.8 * T, text: "Речка ↓" });
+objs.push({ type: "sign", x: 56 * T, y: 23.8 * T, text: "Лес →" });
+const nearAny = (x, y, types, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (types.includes(get(x + i, y + j))) return true; return false; };
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const t = get(x, y);
+  const clear = Math.hypot(x - CAMP.x, y - CAMP.y) < 5 || Math.hypot(x - CAVE.x, y - CAVE.y) < 8;
+  if (t === FOREST && !clear && !nearAny(x, y, [PATH, SHALLOW, SAND], 1) && rnd() < 0.3) {
+    objs.push({ type: "tree", x: (x + 0.5) * T, y: (y + 0.9) * T, v: rnd(), dark: true }); solidObj[at(x, y)] = 1;
+  } else if (t === GRASS && !nearAny(x, y, [PATH, SHALLOW, SAND, WALL, FLOOR, HILL], 2) && rnd() < 0.05) {
+    objs.push({ type: "tree", x: (x + 0.5) * T, y: (y + 0.9) * T, v: rnd() }); solidObj[at(x, y)] = 1;
+  }
+}
+const isSolid = (tx, ty) => { const t = get(tx, ty); return t === WATER || t === WALL || t === WIN || solidObj[at(tx, ty)] === 1; };
+
+// ============ Герои ============
+const NAMES = { romomeo: "Ромомэо", omeshkin: "Омешкин", pelmeshkin: "Пельмешкин", amira: "Амира", mama: "Мама", both: "Омешкин и Пельмешкин", all: "Все вместе", narr: "📖 Рассказ", monster: "Голубой монстр" };
+const actors = [];
+function mk(kind, tx, ty, o = {}) { const a = Object.assign({ kind, x: tx * T, y: ty * T, dir: 1, phase: 0, alpha: 1, shake: 0 }, o); actors.push(a); return a; }
+const player = mk("romomeo", 11.5, 21.3, { dir: 1 });
+const O = mk("omeshkin", 13.8, 19.6, { dir: -1 });
+const P = mk("pelmeshkin", 11.5, 17.6, { dir: 1 });
+const A = mk("amira", 10, 12.6);
+const M = mk("mama", 22.6, 11.9, { dir: -1 });
+const KOT = mk("kitten", 15.5, 21.5, { dir: -1 });
+const MON = mk("monster", CAVE.x, CAVE.y, { sleeping: true });
+const UHO = mk("kittenEar", 0, 0, { hidden: true });
+const followers = [O, P];
+let following = false;
+const trail = [];
+
+// ============ Экран ============
+const cv = document.getElementById("game"), ctx = cv.getContext("2d");
+let VW, VH, Z, DPR;
+function resize() {
+  DPR = Math.min(2, devicePixelRatio || 1);
+  VW = innerWidth; VH = innerHeight; cv.width = VW * DPR; cv.height = VH * DPR;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  Z = Math.min(1.25, Math.max(0.75, Math.min(VW, VH) / 560));
+}
+addEventListener("resize", resize); resize();
+
+const cam = { x: player.x, y: player.y };
+let focus = null, camShake = 0, time = 0;
+let running = false, busy = false, stage = "intro";
+let night = 0, tint = null, raining = false, torch = false, fire = null, steam = false, stones = false, tent = false;
+const particles = [];
+let obj = null, speakers = [];
+let pickups = [];           // предметы, которые можно подобрать
+let crays = [];             // раки в речке
+let task = null;            // текущее задание со списком
+
+// ============ Управление ============
+const keys = {};
+addEventListener("keydown", (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if ([" ", "enter", "e"].includes(e.key.toLowerCase())) { advance(); e.preventDefault(); }
+  if (e.key.startsWith("Arrow")) e.preventDefault();
+});
+addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+const stick = { on: false, ox: 0, oy: 0, x: 0, y: 0, id: null };
+cv.addEventListener("pointerdown", (e) => {
+  if (dlg.open) { advance(); return; }
+  stick.on = true; stick.id = e.pointerId; stick.ox = stick.x = e.clientX; stick.oy = stick.y = e.clientY;
+});
+addEventListener("pointermove", (e) => { if (stick.on && e.pointerId === stick.id) { stick.x = e.clientX; stick.y = e.clientY; } });
+addEventListener("pointerup", (e) => { if (e.pointerId === stick.id) stick.on = false; });
+addEventListener("pointercancel", () => { stick.on = false; });
+
+// ============ Диалоги и эффекты ============
+const $ = (s) => document.querySelector(s);
+const dlg = { open: false, full: "", shown: 0, resolve: null };
+const FACES = {};
+function say(who, text) {
+  return new Promise((res) => {
+    const group = { both: [O, P], all: [player, O, P] };
+    speakers = group[who] || actors.filter((a) => a.kind === who && !a.hidden);
+    const faceKeys = who === "both" ? ["omeshkin", "pelmeshkin"] : who === "all" ? ["romomeo", "omeshkin", "pelmeshkin"] : FACES[who] ? [who] : [];
+    $("#dialog .faces").innerHTML = faceKeys.map((k) => `<img src="${FACES[k]}" alt="">`).join("");
+    $("#dialog .who").textContent = NAMES[who] || who;
+    $("#dialog .who").className = "who" + (who === "narr" ? " narr" : "");
+    $("#dialog .txt").className = "txt" + (who === "narr" ? " narr" : "");
+    $("#dialog .txt").textContent = "";
+    $("#dialog").classList.add("show");
+    Object.assign(dlg, { open: true, full: text, shown: 0, resolve: res });
+  });
+}
+function advance() {
+  if (!dlg.open) return;
+  if (dlg.shown < dlg.full.length) { dlg.shown = dlg.full.length; $("#dialog .txt").textContent = dlg.full; return; }
+  dlg.open = false; speakers = [];
+  $("#dialog").classList.remove("show");
+  const r = dlg.resolve; dlg.resolve = null; r && r();
+}
+$("#dialog").addEventListener("pointerdown", (e) => { e.stopPropagation(); advance(); });
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+function moveTo(a, tx, ty, speed = 110) { return new Promise((r) => { a.target = { x: tx * T, y: ty * T }; a.speed = speed; a.resolve = r; }); }
+function big(text, ms = 900) { const b = $("#big"); b.textContent = text; b.style.opacity = 1; setTimeout(() => (b.style.opacity = 0), ms); }
+let toastT = 0;
+function toast(text) { const t = $("#toast"); t.textContent = text; t.style.opacity = 1; clearTimeout(toastT); toastT = setTimeout(() => (t.style.opacity = 0), 1800); }
+async function fade(v, ms) { const f = $("#fade"); f.style.transition = `opacity ${ms}ms`; f.style.opacity = v; await wait(ms); }
+async function chapter(num, name) {
+  const c = $("#chapter"); c.querySelector("small").textContent = "Глава " + num; c.querySelector("span").textContent = name;
+  c.style.opacity = 1; await wait(1800); c.style.opacity = 0; await wait(500);
+}
+function emoji(ch, x, y, n = 1, spread = 20) {
+  for (let i = 0; i < n; i++) particles.push({ ch, x: x + (Math.random() - 0.5) * spread, y: y + (Math.random() - 0.5) * spread, vx: (Math.random() - 0.5) * 40, vy: -40 - Math.random() * 40, life: 1.4 });
+}
+function objective(text, tx, ty) { $("#quest").innerHTML = "🎯 " + text; obj = tx == null ? null : { x: tx * T, y: ty * T }; }
+function place(a, tx, ty) { a.x = tx * T; a.y = ty * T; a.hidden = false; a.target = null; }
+function setTask(title, list) { task = { title, list }; renderTask(); }
+function renderTask() {
+  const el = $("#tasks");
+  if (!task) { el.style.display = "none"; return; }
+  el.style.display = "block";
+  el.innerHTML = `<b>${task.title}</b><br>` + task.list.map((i) => `<span class="${i.done ? "done" : ""}">${i.done ? "✅" : "▫️"} ${i.label}</span>`).join("<br>");
+}
+// убрать деревья вокруг предмета, чтобы до него можно было дойти
+function clearSpot(px, py) {
+  const tx = Math.floor(px / T), ty = Math.floor(py / T);
+  for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
+    const x = tx + i, y = ty + j; if (!solidObj[at(x, y)] || get(x, y) === FLOOR) continue;
+    solidObj[at(x, y)] = 0;
+    const k = objs.findIndex((o) => o.type === "tree" && Math.floor(o.x / T) === x && Math.floor(o.y / T) === y); if (k >= 0) objs.splice(k, 1);
+  }
+}
+function startFollow() { following = true; trail.length = 0; for (let i = 0; i < 40; i++) trail.push({ x: player.x, y: player.y }); }
+
+// ============ Сцены по книге ============
+async function run(scene) { busy = true; stick.on = false; try { await scene(); } finally { busy = false; focus = null; } }
+
+async function sIntro() {
+  focus = { x: 12 * T, y: 18.5 * T };
+  await chapter(1, "Дома");
+  await say("narr", "Мы всей компашкой сидели за столом, пили чай, и вдруг тишину перебил Пельмешкин.");
+  await say("pelmeshkin", "Я пельмешки хочу!");
+  await say("romomeo", "Пойдёмте в тёмную пещеру или на гору...");
+  await say("pelmeshkin", "Может, всё-таки поедим пельмешки?");
+  await say("omeshkin", "Да ты надоел со своими пельменями! Давайте лучше морошку поедим! 😡");
+  await say("romomeo", "Да тем более я ещё не договорил! Зачем ты меня перебиваешь? Пойдёмте в лес!");
+  await say("pelmeshkin", "А там есть пельмешки?");
+  await say("romomeo", "Нет, там есть грибы.");
+  await say("omeshkin", "А это что-то съедобное?");
+  await say("romomeo", "Да. Ну что, пойдём в лес?");
+  await say("omeshkin", "Да!");
+  await say("pelmeshkin", "А пельмешки с собой возьмём?");
+  await say("narr", "Минута молчания. Все взгляды уставлены на Пельмешкина.");
+  await say("romomeo", "Так, собирайте рюкзаки. Берите всё самое нужное, какую-то сытную еду, например хлеб. Пельмешкин, только попробуй взять пельмешки!");
+  await say("pelmeshkin", "Эй, вообще-то меня зовут Бока!");
+  stage = "pack";
+  const L = [["torch", "🔦", "Фонарик", 7.5, 20.5], ["knife", "🔪", "Ножик", 15.5, 17], ["can", "🥫", "Консерва", 20.5, 20.5], ["matches", "🔥", "Спички", 22.5, 13.5],
+    ["tent", "⛺", "Палатка", 9, 13.5], ["bag", "🛌", "Спальный мешок", 14, 12.5], ["pot", "🍲", "Котелок", 19, 14], ["map", "🗺️", "Карта с компасом", 16, 21]];
+  pickups = L.map(([id, icon, label, x, y]) => ({ id, icon, label, x: x * T, y: y * T, group: "pack" }));
+  setTask("Собери рюкзак:", pickups.map((p) => ({ id: p.id, label: p.icon + " " + p.label, done: false })));
+  objective("Собери всё самое нужное по всему дому", null);
+}
+
+async function sPacked() {
+  task = null; renderTask();
+  focus = { x: 12 * T, y: 18.5 * T };
+  place(player, 11.5, 21.2); player.dir = 1; O.dir = -1; P.dir = 1;
+  await say("narr", "Ромомэо взял всё самое нужное. А Омешкин взял мороженое, шоколадки, газировку, воду с сиропом и конфеты. Короче, весь свой годовой запас вкусняшек.");
+  await say("omeshkin", "Ещё матрас, чтобы в лесу лучше спалось... Не влезает! Ладно, возьму одеяло и подушку. И котю!");
+  emoji("😿", KOT.x, KOT.y - 40);
+  await say("narr", "Котя был маленький, но в рюкзак всё равно не поместился.");
+  await say("narr", "А Пельмешкин взял побольше пельменей и соус для чипсов. А про одеяло и подушку совершенно забыл.");
+  await say("romomeo", "Вы же всё, что нужно, взяли?");
+  await say("both", "Мы всё взяли!");
+  await say("omeshkin", "Я знаю, как упроситься у мамы! Скажем, что пойдём на речку, а сами пойдём в лес.");
+  await say("romomeo", "Мама не пустит нас одних на речку. Скажет, чтобы мы пошли с Амирой, а она расскажет маме, что мы идём в лес.");
+  await say("omeshkin", "Да, но мы сначала искупаемся, а потом, когда Амира уйдёт, пойдём в лес!");
+  await say("all", "Хорошая идея!");
+  big("Операция\n«О.М.И.Р.А.»", 1500); await wait(1600);
+  stage = "mama"; startFollow();
+  setTask("Операция «О.М.И.Р.А.»:", [{ id: 1, label: "1. Пойти на кухню к маме" }, { id: 2, label: "2. Отпроситься на речку" }, { id: 3, label: "3. Позвать Амиру" }, { id: 4, label: "4. Искупаться" }, { id: 5, label: "5. Незаметно уйти в лес" }]);
+  objective("Иди на <b>кухню</b> к маме", 21, 13);
+}
+const tick = (id) => { if (task) { task.list.forEach((i) => { if (i.id <= id) i.done = true; }); renderTask(); } };
+
+async function sMama() {
+  focus = { x: 21 * T, y: 13 * T }; tick(1);
+  await say("narr", "На кухне мама готовила что-то на сковородке.");
+  await say("romomeo", "Мама, можно мы пойдём на речку?");
+  await say("mama", "Да. Только с Амирой.");
+  await say("all", "Хорошо, мама!");
+  tick(2); stage = "amira";
+  objective("Иди в <b>комнату Амиры</b>", 10, 12.5);
+}
+async function sAmira() {
+  focus = { x: 10 * T, y: 12.5 * T }; A.dir = 1;
+  await say("romomeo", "Амира, пойдём на речку!");
+  await say("amira", "Вы что, сами не можете?");
+  await say("romomeo", "Нет, нам мама не разрешает.");
+  await say("amira", "Эх, ладно, пойдёмте.");
+  await say("romomeo", "Искупаться... Мы через окно зайдём, хорошо?");
+  await say("amira", "Хорошо.");
+  tick(3); followers.push(A); stage = "river";
+  objective("Иди на <b>речку</b> (выйди через дверь и иди на юг)", 13, 28.5);
+}
+async function sSwim() {
+  focus = { x: 13 * T, y: 29 * T }; following = false;
+  await Promise.all([moveTo(player, 12, 29, 120), moveTo(O, 14, 29.3, 120), moveTo(P, 10.5, 29.5, 120), moveTo(A, 16, 28.8, 120)]);
+  for (let i = 0; i < 4; i++) { [player, O, P, A].forEach((a) => emoji("💦", a.x, a.y - 20, 2, 30)); await wait(350); }
+  await say("narr", "Ребята искупались. Вода была тёплая и весёлая!");
+  tick(4);
+  await say("amira", "Ладно, я пошла домой. Не задерживайтесь!");
+  followers.splice(followers.indexOf(A), 1);
+  await moveTo(A, 12.5, 23.6, 130); A.hidden = true;
+  await say("romomeo", "Пока никто не видит — берём рюкзаки и идём в лес!");
+  tick(5);
+  big("Операция\nзакончена! ✅", 1400); await wait(1500);
+  task = null; renderTask();
+  await chapter(2, "Улица");
+  await say("omeshkin", "А куда нам идти?");
+  await say("romomeo", "Сейчас посмотрим на карте... Наш дом на северо-западе. До леса 5 километров. Нам надо идти направо!");
+  startFollow(); stage = "road";
+  objective("Иди по тропинке на <b>восток</b>, к лесу", 56, 24.5);
+}
+async function sHungry() {
+  await say("omeshkin", "А сколько ещё идти? Я уже голодный!");
+  await say("romomeo", "Подожди, ещё где-то час.");
+  await say("pelmeshkin", "Ого, как много! А может, пельмешки поедим?");
+  await say("romomeo", "Подождите немного.");
+}
+async function sSpirt() {
+  const bottle = { type: "bottle", x: player.x + 60, y: player.y - 30 }; objs.push(bottle);
+  await say("omeshkin", "Спирт!");
+  await say("romomeo", "Какой ещё спирт?");
+  await say("omeshkin", "Да вот же, спирт тут!");
+  await say("romomeo", "Молодец. Может, тебе ещё грамоту выдать? Только не поднимай его!");
+  objs.splice(objs.indexOf(bottle), 1); O.item = "bottle"; emoji("🍾", O.x, O.y - 50);
+  await say("narr", "И в ту же секунду он оказался у Омешкина в руках.");
+  O.item = null;
+}
+async function sHill() {
+  tint = "sunset";
+  await say("narr", "Они зашли на холм и увидели вдалеке, на закате, лес. Облака развеялись. С каждой минутой становилось всё темнее и темнее...");
+}
+async function sForestEdge() {
+  night = 0.55;
+  await say("narr", "И к ночи они подошли к огромному и страшному лесу.");
+  await say("omeshkin", "Может, пойдём обратно?");
+  await say("pelmeshkin", "Нет! Я не могу уже ждать, я хочу пельмешки!");
+  await say("romomeo", "Да. Раз пошли, значит, возвращаться нельзя.");
+  await chapter(3, "Лес");
+  night = 0.82; tint = null;
+  await say("narr", "Там стало ещё страшнее.");
+  await say("pelmeshkin", "Всё! Давайте есть пельмешки!");
+  await say("romomeo", "Нет, сначала надо найти место для ночлега.");
+  torch = true; big("🔦", 700);
+  await say("narr", "Ромомэо достал из рюкзака фонарь и включил. Вокруг стало светлее.");
+  stage = "findCamp";
+  objective("Найди в лесу <b>место для ночлега</b>", CAMP.x + 2, CAMP.y - 1);
+}
+async function sCamp() {
+  focus = { x: CAMP.x * T, y: CAMP.y * T }; following = false;
+  await say("narr", "Вдруг они увидели поваленное дерево.");
+  await say("romomeo", "Это хороший ночлег! Так, собирайте палки и сушёные листья, их надо много. После этого можно поесть.");
+  await say("all", "Ура!");
+  stage = "sticks";
+  const spots = [[-4, -3], [3, 4], [-5, 3], [5, -3], [0, 5], [-2, -5], [6, 1], [-6, 0]];
+  pickups = spots.map(([dx, dy], i) => ({ id: "s" + i, icon: i % 2 ? "🍂" : "🪵", label: "", x: (CAMP.x + dx) * T, y: (CAMP.y + dy) * T, group: "sticks" }));
+  pickups.forEach((p) => clearSpot(p.x, p.y));
+  setTask("Для костра:", [{ id: "n", label: "Палки и сушёные листья: 0 / 8", done: false }]);
+  objective("Собери <b>палки и листья</b> вокруг лагеря", null);
+  [O, P].forEach((a, i) => moveTo(a, CAMP.x - 1 + i * 2, CAMP.y + 1, 90));
+}
+async function sFire() {
+  task = null; renderTask();
+  focus = { x: CAMP.x * T, y: CAMP.y * T };
+  await moveTo(player, CAMP.x - 1.2, CAMP.y + 0.3, 140); player.dir = 1;
+  stones = true; await say("romomeo", "Кидайте их вот сюда!");
+  await say("narr", "Ромомэо поставил три больших камня, достал из рюкзака спички и развёл огонь.");
+  fire = { x: CAMP.x * T, y: (CAMP.y + 0.4) * T }; emoji("🔥", fire.x, fire.y - 20, 4, 30);
+  await wait(500);
+  tent = true; await say("romomeo", "Потом поставил палатку. Садитесь и давайте кушать!");
+  place(O, CAMP.x + 1.4, CAMP.y + 0.6); place(P, CAMP.x, CAMP.y + 1.6); O.dir = -1;
+  await say("narr", "Ромомэо достал консерву и хлеб, Омешкин — вкусняшки, а Пельмешкин... вы сами знаете что.");
+  emoji("🥫", player.x, player.y - 60); emoji("🍫", O.x, O.y - 60); emoji("🥟", P.x, P.y - 60);
+  await wait(700);
+  await say("narr", "Ребята покушали и начали собираться спать. Ромомэо достал спальный мешок, Омешкин — одеяло и подушку.");
+  await say("pelmeshkin", "А на чём мне спать?");
+  await say("romomeo", "Ты что, не взял с собой ничего? Ну ничего. Ложись в палатку, а одеялом поделится Омешкин.");
+  await say("omeshkin", "Э, что? Я с ним одеялом не буду делиться!");
+  await say("pelmeshkin", "А я с ним спать не хочу — он пукает по ночам!");
+  await say("omeshkin", "Эй, это ты пукаешь по ночам! Объешься пельменями, а потом всю ночь пукаешь!");
+  await say("narr", "Они начали спорить, и вдруг...");
+  emoji("💨", P.x - 10, P.y - 10, 3, 20); big("ПУК!", 700); await wait(800);
+  emoji("💨", P.x - 10, P.y - 10, 3, 20); big("ПУК!", 700); await wait(800);
+  await say("pelmeshkin", "Ой, извините. Мне надо в туалет...");
+  await say("romomeo", "Ну понятно, кто пукает по ночам.");
+  await say("narr", "Пельмешкин покраснел, но ничего не сказал и побежал за дерево.");
+  await say("romomeo", "Давайте просто это забудем и пойдём спать.");
+  await say("narr", "Ребята легли спать. Не знаю, поделился ли Омешкин одеялом с Бокой?");
+  await fade(1, 1200);
+  O.lying = P.lying = true; place(O, CAMP.x + 1.5, CAMP.y + 1.8); place(P, CAMP.x - 1.8, CAMP.y + 2); place(player, CAMP.x - 1.5, CAMP.y + 0.3);
+  fire = null; night = 0; torch = false;
+  await wait(600); await fade(0, 1200);
+  await chapter(4, "Утро");
+  emoji("🐦", player.x - 100, player.y - 120, 2, 60); emoji("🎵", player.x + 60, player.y - 140, 2, 60);
+  await say("narr", "Утром пение птиц разбудило Ромомэо. Ребята ещё спали, костёр уже потух.");
+  await say("narr", "Консервы осталось мало, а на одних вкусняшках и пельменях не прожить. Ромомэо захотелось приготовить грибной суп.");
+  stage = "mushrooms";
+  const good = [[-6, -6], [4, -6], [8, 3], [11, 0], [-7, 7], [2, 8], [13, -2]], bad = [[-3, -7], [9, -4], [6, 7], [-8, 2], [12, 3]];
+  pickups = [...good.map(([dx, dy], i) => ({ id: "g" + i, kind: "good", x: (CAMP.x + dx) * T, y: (CAMP.y + dy) * T, group: "mush" })),
+             ...bad.map(([dx, dy], i) => ({ id: "b" + i, kind: "bad", x: (CAMP.x + dx) * T, y: (CAMP.y + dy) * T, group: "mush" }))];
+  pickups.forEach((p) => clearSpot(p.x, p.y));
+  setTask("Грибной суп:", [{ id: "m", label: "Съедобные грибы: 0 / 5", done: false }, { id: "x", label: "Мухоморы не брать! 🍄", done: false }]);
+  objective("Собери <b>5 съедобных грибов</b> (коричневые). Мухоморы ядовитые!", null);
+}
+let mushCount = 0, crayCount = 0;
+async function sToRiver() {
+  task = null; renderTask(); stage = "toRiver"; pickups = [];
+  toast("Теперь надо найти какой-то источник воды...");
+  objective("Иди на <b>восток</b> — слышен шум воды", 91, 30.5);
+}
+async function sRiver() {
+  focus = { x: 93 * T, y: 30.5 * T };
+  await say("narr", "Ромомэо услышал шум воды и увидел красивую синюю, почти прозрачную речку. Через неё было видно песок и всяких речных жителей.");
+  await say("romomeo", "Вода очень вкусная! Но надо найти большую бутылку.");
+  await say("narr", "Он нашёл много пустых бутылок, но они были маленькие. Скоро он нашёл двухлитровую бутылку, а в ней был маленький рачок!");
+  emoji("🦞", player.x + 30, player.y - 40);
+  await say("romomeo", "Точно! Можно приготовить суп с раками и грибами!");
+  await say("narr", "На дне он нашёл сломанное ведро. В нём была дырка, но она была меньше, чем любой рак.");
+  stage = "crays";
+  crays = [];
+  for (let i = 0; i < 9; i++) {
+    const ty = 22 + Math.floor(rnd() * 18), o = Math.round(Math.sin(ty * 0.18) * 1.5);
+    crays.push({ x: (92 + o + 0.5 + rnd() * 3) * T, y: (ty + 0.5) * T, vx: 0, vy: 0, t: 0, caught: false });
+  }
+  setTask("Раки:", [{ id: "c", label: "Поймано раков: 0 / 6", done: false }]);
+  objective("Зайди в речку и <b>поймай 6 раков</b> 🦞", null);
+}
+async function sCrayDone() {
+  task = null; renderTask();
+  await say("narr", "Один рак почти выбрался из ведра, а другой пытался залезть по стенке. Ромомэо быстро угомонил этих двух раков и набрал воды.");
+  await say("romomeo", "Фух! А теперь можно и обратно.");
+  crays = []; stage = "backCamp";
+  O.lying = P.lying = false; place(O, CAMP.x + 1.5, CAMP.y + 1.5); place(P, CAMP.x - 1.5, CAMP.y + 2);
+  objective("Неси раков и грибы <b>в лагерь</b>", CAMP.x, CAMP.y);
+}
+async function sSoup() {
+  focus = { x: CAMP.x * T, y: CAMP.y * T }; player.item = null;
+  await moveTo(player, CAMP.x - 1.3, CAMP.y + 0.3, 140); player.dir = 1; O.dir = -1; P.dir = 1;
+  await say("omeshkin", "Где ты был? Мы тебя уже везде искали!");
+  await say("romomeo", "Я просто к речке пошёл воды набрать.");
+  await say("omeshkin", "Понятно. А что у тебя в ведре? И вообще, что это за ведро такое? А в пакете что?");
+  await say("romomeo", "В ведре у меня раки. А что за ведро — не знаю, просто нашёл. В пакете грибы.");
+  await say("omeshkin", "Ого! А раки — это что такое? Это что-то вкусное?");
+  await say("pelmeshkin", "Нет, это наверное сорт каких-то пельмешек.");
+  await say("romomeo", "Нет, это никакие не пельмешки! Это очень вкусное блюдо, деликатес. Только они сырые, их надо сварить.");
+  await say("omeshkin", "Ого, можно посмотреть?");
+  await say("romomeo", "Да, конечно, смотри. Только смотри, чтобы они тебя клешнями не цапнули!");
+  await say("pelmeshkin", "А там пельмешки есть?");
+  await say("romomeo", "Нет, Пельмешкин, их нет.");
+  await say("pelmeshkin", "Эй, вообще-то меня зовут Бока!");
+  await say("romomeo", "Ага, мы поняли. Давайте лучше уже варить наш суп с грибами и раками!");
+  fire = { x: CAMP.x * T, y: (CAMP.y + 0.4) * T }; steam = true;
+  await say("narr", "Они поставили котелок с водой на костёр и начали ждать, пока вода закипит.");
+  emoji("🦞", fire.x, fire.y - 40, 5, 30); await wait(900);
+  await say("omeshkin", "Они стали такие красные, как рак! А, точно, это и есть раки. Теперь я понял, где раки зимуют!");
+  emoji("🍄", fire.x, fire.y - 40, 4, 30);
+  await say("romomeo", "Надо закинуть туда грибы!");
+  await say("narr", "Через пару минут всё было готово. Ромомэо достал ложки, которые смастерил сам, и вручил их друзьям.");
+  await say("omeshkin", "Фу, что с ними?");
+  emoji("😋", P.x, P.y - 70); emoji("😋", player.x, player.y - 70);
+  await say("narr", "А Пельмешкин уже вовсю начал поедать вкуснейший суп, и Ромомэо тоже присоединился.");
+  await say("omeshkin", "Э, подождите меня! ...Ммм, как вкусно!");
+  await say("pelmeshkin", "Но пельмени были бы вкусней.");
+  steam = false; fire = null;
+  await say("romomeo", "Ладно, собирайте палатку и пойдёмте дальше.");
+  await say("omeshkin", "Дальше — это домой?");
+  await say("romomeo", "Нет, это в противоположную сторону от дома.");
+  await say("omeshkin", "Что?! Я думал, что мы просто зайдём в лес, поспим и вернёмся!");
+  await say("romomeo", "Нетушки. Пойдёмте!");
+  tent = false; emoji("⛺", CAMP.x * T + 50, CAMP.y * T - 30, 1);
+  await say("narr", "Ромомэо сложил палатку, и она стала такой маленькой, что поместилась в рюкзак.");
+  await say("pelmeshkin", "Ой, а где мой рюкзак?");
+  await say("narr", "Все начали искать его рюкзак...");
+  P.hidden = true; objs.push({ type: "leaves", x: (CAMP.x + 3) * T, y: (CAMP.y + 3) * T, id: "pile" });
+  focus = null; stage = "findBag";
+  objective("Помоги найти рюкзак Пельмешкина — проверь <b>кучу листьев</b>", CAMP.x + 3, CAMP.y + 3);
+}
+async function sLeaves() {
+  focus = { x: (CAMP.x + 3) * T, y: (CAMP.y + 3) * T };
+  big("АААА!", 900); camShake = 8; await wait(900);
+  await say("romomeo", "Кто это? Омешкин, ты?");
+  await say("omeshkin", "Нет, не я.");
+  await say("pelmeshkin", "Да слезьте вы с меня!");
+  big("АААААА!", 900); await wait(900);
+  objs.splice(objs.findIndex((o) => o.id === "pile"), 1);
+  place(P, CAMP.x + 3, CAMP.y + 3); emoji("🍂", P.x, P.y - 30, 8, 50);
+  await say("pelmeshkin", "Аааа! Как больно!");
+  await say("romomeo", "А это ты? Что ты делал в листьях?");
+  await say("pelmeshkin", "Рюкзак искал! Я думал, что он где-то там.");
+  await say("narr", "Пельмешкин хотел, конечно, хорошенько дать Ромомэо, но Омешкин пообещал, что найдёт его рюкзак, если он помирится с Ромомэо.");
+  await say("omeshkin", "Мирись, мирись, мирись и больше не дерись!");
+  await say("pelmeshkin", "Ты меня за маленького держишь?");
+  emoji("👊", player.x, player.y - 60); player.shake = 0.4;
+  await say("romomeo", "Ай, ты чего? Ладно, справедливо. Но я же не знал! Пойдёмте, а то скоро темнеть будет.");
+  await say("all", "Да ладно, пойдёмте!");
+  await chapter(5, "Страшная глушь");
+  night = 0.6; torch = true; startFollow(); stage = "deep";
+  objective("Идите дальше в <b>глушь</b> (на юг по тропинке)", 78, 44);
+}
+async function sRain() {
+  night = 0.84; raining = true;
+  await say("narr", "Ребята шли и шли. Уже темнело. Ещё час — и стало совсем темно.");
+  await say("all", "Аааа! Как страшно! Что за звуки?");
+  big("🌧️", 800);
+  await say("omeshkin", "Ааа! Ещё и дождь пошёл!");
+  await say("romomeo", "Нам надо найти какое-то помещение... О, смотрите, там пещера! Пошлите туда!");
+  objective("Бегите в <b>пещеру</b>, пока идёт дождь!", CAVE.x, CAVE.y - 0.5);
+}
+async function sCave() {
+  focus = { x: CAVE.x * T, y: (CAVE.y - 1) * T }; following = false; raining = false;
+  await Promise.all([moveTo(player, CAVE.x - 1.2, CAVE.y - 0.2, 150), moveTo(O, CAVE.x + 0.2, CAVE.y + 0.1, 150), moveTo(P, CAVE.x + 1.4, CAVE.y - 0.1, 150)]);
+  await say("omeshkin", "Может, всё-таки раскроем палатку?");
+  await say("romomeo", "А зачем расстилать палатку? Я спать хочу. Можно же просто спать на полу. Одеяло расстелили — и всё.");
+  await say("omeshkin", "Ладно...");
+  player.lying = O.lying = true; torch = false;
+  await say("narr", "Они легли спать, но Пельмешкин никак не мог заснуть. Уже, наверное, час ночи. Он слышал какие-то звуки — то ли мяуканье, то ли что...");
+  await moveTo(P, CAVE.x + 3.5, CAVE.y + 2.5, 70); P.dir = 1;
+  UHO.hidden = false; place(UHO, CAVE.x + 4.6, CAVE.y + 2.7); UHO.dir = -1;
+  focus = UHO;
+  await say("narr", "Снаружи было совсем темно и страшно. Рядом он увидел котёнка. Он был полностью белым.");
+  await say("narr", "Пельмешкин затащил его внутрь пещеры и хотел накормить, но его рюкзак потерялся. Так что он полез в рюкзак Ромомэо...");
+  await say("narr", "...и увидел внутри меня, маленького рачка! Он так испугался, что закрыл глаза и начал что-то доставать наугад.");
+  await say("pelmeshkin", "Ай! Укололся! Это ножик...");
+  torch = true; await wait(300); torch = false;
+  await say("narr", "Потом он что-то укусил — и включился свет! Это оказался фонарик. Ромомэо чуть не проснулся.");
+  emoji("🥫", UHO.x, UHO.y - 30);
+  await say("narr", "Наконец он нащупал консерву и накормил котёнка. Когда тот кушал, он был так похож на пельмешек, что Пельмешкин чуть не откусил кусочек!");
+  await say("narr", "Котёнок доел, свернулся клубочком и заснул. Тогда Пельмешкин тоже лёг спать.");
+  await fade(1, 1200);
+  UHO.hidden = true; P.item = "kitten"; place(P, CAVE.x + 1.4, CAVE.y - 0.1); P.lying = true;
+  await wait(600);
+  night = 0.35; await fade(0, 1200);
+  await chapter(6, "Что-то странное");
+  await say("narr", "Что случилось, пока герои спали? Как обычно, первым проснулся Ромомэо.");
+  player.lying = false;
+  await say("narr", "Вокруг себя он увидел кучу синих кристаллов. Все стены были синие и как будто двигались. А на одной из них был какой-то круг, полностью чёрный.");
+  O.lying = P.lying = false;
+  await say("all", "Аааааааааааааааа! Где мы?!");
+  await say("romomeo", "Хватит орать!");
+  MON.sleeping = false; big("👁️", 900); MON.shake = 0.8; await wait(900);
+  await say("omeshkin", "Что за звуки?");
+  await say("monster", "Гог! Гок!");
+  await say("romomeo", "Бежим!");
+  await say("pelmeshkin", "Ща я отломлю кусок этой штуки!");
+  await say("romomeo", "Ты что? Не надо!");
+  emoji("💎", P.x + 20, P.y - 60, 5, 30); big("ХРУСТ!", 700); camShake = 10; await wait(800);
+  await say("narr", "Но было уже поздно. Кусок кристалла отвалился и упал.");
+  await say("all", "Побежали!");
+  emoji("🐱", P.x, P.y - 30);
+  await say("narr", "Пельмешкин подобрал кристалл и побежал. Вдруг у него из кофты вывалился маленький пельмешек. Он хотел засунуть его в рот, но это оказался котёнок! Он засунул его обратно.");
+  await Promise.all([moveTo(player, CAVE.x - 5, CAVE.y + 3, 200), moveTo(O, CAVE.x - 4, CAVE.y + 4, 200), moveTo(P, CAVE.x - 6, CAVE.y + 4, 200)]);
+  night = 0; MON.stand = true;
+  big("😱", 800); camShake = 12;
+  await say("narr", "Когда они вышли, то увидели, что всё это время сидели на руках у гигантского голубого монстра с сиропом на голове и одним полностью чёрным глазом!");
+  await say("narr", "Омешкин сейчас же полез ему на голову и оседлал монстра!");
+  O.riding = true; O.hidden = true;
+  followers.length = 0; followers.push(P, MON); startFollow();
+  stage = "home";
+  objective("Бегите <b>домой</b> — на запад, через лес и холм!", 12.5, 26);
+}
+async function sSpirt2() {
+  await say("omeshkin", "О, смотрите! Там спирт!");
+  await say("romomeo", "Какой ещё спирт?");
+  await say("omeshkin", "Да вот же, спирт тут!");
+  await say("romomeo", "Молодец. Может, тебе ещё грамоту выдать? Только не поднимай его!");
+  emoji("🍾", MON.x, MON.y - 300);
+  await say("narr", "И в ту же секунду он оказался у него в руках. Прямо с головы монстра!");
+}
+async function sNearHome() {
+  focus = { x: player.x, y: player.y }; following = false;
+  await say("narr", "Снова повернули, и опять повернули... Вот вдали показался дом!");
+  O.riding = false; place(O, MON.x / T - 1, MON.y / T + 0.5); O.lying = true; big("БУХ!", 700); camShake = 8;
+  await say("narr", "Омешкин свалился с монстра, а монстр убежал обратно в лес.");
+  MON.dir = 1; await moveTo(MON, 60, MON.y / T, 380); MON.hidden = true;
+  O.lying = false; night = 0.7; torch = true;
+  followers.length = 0; followers.push(O, P); startFollow();
+  stage = "window";
+  objective("Уже совсем темно. Залезайте домой <b>через окно</b>", 8.5, 24);
+}
+async function sFinal() {
+  following = false;
+  await fade(1, 700);
+  place(player, 8.5, 21); place(O, 10, 21.5); place(P, 7.5, 21.6); P.item = null;
+  place(KOT, 9.5, 20.2); place(UHO, 11, 20.4); UHO.dir = -1;
+  focus = { x: 10 * T, y: 20 * T }; night = 0.35; torch = false;
+  await fade(0, 700);
+  await say("narr", "Когда они уже залезли домой через окно, у окна их встретил Котя. А Пельмешкин достал такого же котю!");
+  await say("romomeo", "Откуда это он у тебя?");
+  await say("omeshkin", "А какой настоящий?");
+  await say("pelmeshkin", "Не знаю...");
+  emoji("💕", KOT.x + 20, KOT.y - 30, 3, 30);
+  await say("narr", "Котята начали играть.");
+  await say("romomeo", "Ладно, оставим их обоих. А как мы будем их различать?");
+  await say("pelmeshkin", "Вот, смотрите: у подделки с ухом что-то, а у настоящего всё в порядке.");
+  await say("omeshkin", "А как их назовём? Первый котя, второй котя?");
+  await say("romomeo", "Настоящего — Котя, а этого — Ухо. Из-за того, что у него что-то с ухом.");
+  emoji("🎒", player.x, player.y - 60);
+  await say("narr", "Когда Ромомэо достал палатку из своего рюкзака, из палатки вывалился рюкзак Пельмешкина!");
+  await say("pelmeshkin", "О! Рюкзак!");
+  emoji("🥟", P.x, P.y - 60, 4, 30);
+  await say("narr", "Пельмешкин сразу открыл его и начал есть пельмешки. И вдруг в комнату зашла мама...");
+  place(M, 16, 19); M.dir = -1; focus = { x: 12 * T, y: 20 * T };
+  await moveTo(M, 13, 20, 100);
+  await say("mama", "Ах вы ж! Где были? В лесу?!");
+  big("АХ ВЫ Ж!", 1200); camShake = 12; await wait(1300);
+  await say("narr", "После этого герои больше никогда в жизни не могли сидеть на попе.");
+  stage = "end"; objective("Приключение закончилось. Можно гулять!", null);
+  followers.length = 0; following = false;
+  $("#end").style.display = "flex";
+}
+
+// ============ Обновление ============
+let flags = {};
+function update(dt) {
+  time += dt;
+  if (!busy && !dlg.open) {
+    let vx = 0, vy = 0;
+    if (keys["arrowleft"] || keys["a"] || keys["ф"]) vx -= 1;
+    if (keys["arrowright"] || keys["d"] || keys["в"]) vx += 1;
+    if (keys["arrowup"] || keys["w"] || keys["ц"]) vy -= 1;
+    if (keys["arrowdown"] || keys["s"] || keys["ы"]) vy += 1;
+    if (stick.on) { const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.hypot(dx, dy); if (d > 8) { vx = dx / Math.max(d, 50); vy = dy / Math.max(d, 50); } }
+    const len = Math.hypot(vx, vy);
+    if (len > 1) { vx /= len; vy /= len; }
+    const inWater = get(Math.floor(player.x / T), Math.floor(player.y / T)) === SHALLOW;
+    const speed = 180 * (inWater ? 0.6 : 1);
+    const nx = player.x + vx * speed * dt, ny = player.y + vy * speed * dt;
+    const free = (x, y) => !isSolid(Math.floor((x - 9) / T), Math.floor((y - 6) / T)) && !isSolid(Math.floor((x + 9) / T), Math.floor((y - 6) / T)) &&
+                           !isSolid(Math.floor((x - 9) / T), Math.floor((y + 1) / T)) && !isSolid(Math.floor((x + 9) / T), Math.floor((y + 1) / T));
+    if (free(nx, player.y)) player.x = nx;
+    if (free(player.x, ny)) player.y = ny;
+    player.moving = len > 0.1;
+    if (Math.abs(vx) > 0.1) player.dir = Math.sign(vx);
+    if (player.moving) player.phase += dt * 12;
+    // хвост из друзей
+    if (following) {
+      const last = trail[0];
+      if (Math.hypot(player.x - last.x, player.y - last.y) > 7) { trail.unshift({ x: player.x, y: player.y }); if (trail.length > 120) trail.pop(); }
+      followers.forEach((f, i) => {
+        const gap = f.kind === "monster" ? 22 : 7;
+        const p = trail[Math.min(trail.length - 1, (i + 1) * gap)];
+        const dx = p.x - f.x, dy = p.y - f.y, d = Math.hypot(dx, dy);
+        f.moving = d > 3;
+        if (d > 1) { const st = Math.min(d, (speed + 40) * dt); f.x += (dx / d) * st; f.y += (dy / d) * st; if (Math.abs(dx) > 1) f.dir = Math.sign(dx); f.phase += dt * 12; }
+      });
+    }
+  }
+  for (const a of actors) {
+    if (a.target) {
+      const dx = a.target.x - a.x, dy = a.target.y - a.y, d = Math.hypot(dx, dy), step = a.speed * dt;
+      if (Math.abs(dx) > 1) a.dir = Math.sign(dx);
+      if (d <= step) { a.x = a.target.x; a.y = a.target.y; a.target = null; a.moving = false; const r = a.resolve; a.resolve = null; r && r(); }
+      else { a.x += (dx / d) * step; a.y += (dy / d) * step; a.moving = true; a.phase += dt * 12; }
+    } else if (a !== player && !(following && followers.includes(a))) a.moving = false;
+    if (a.shake > 0) a.shake -= dt;
+  }
+  for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) particles.splice(i, 1); }
+  if (dlg.open && dlg.shown < dlg.full.length) { dlg.shown = Math.min(dlg.full.length, dlg.shown + dt * 45); $("#dialog .txt").textContent = dlg.full.slice(0, Math.floor(dlg.shown)); }
+  const f = focus || player, lift = stage === "home" ? 110 : 20;
+  cam.x += (f.x - cam.x) * Math.min(1, dt * 5); cam.y += (f.y - lift - cam.y) * Math.min(1, dt * 5);
+  camShake = Math.max(0, camShake - dt * 30);
+
+  // раки плавают
+  for (const c of crays) {
+    if (c.caught) continue;
+    c.t -= dt;
+    if (c.t <= 0) { const a = Math.random() * Math.PI * 2; c.vx = Math.cos(a) * 50; c.vy = Math.sin(a) * 50; c.t = 0.6 + Math.random() * 1.2; }
+    const d = Math.hypot(player.x - c.x, player.y - c.y);
+    if (d < 90) { c.vx += ((c.x - player.x) / d) * 90 * dt; c.vy += ((c.y - player.y) / d) * 90 * dt; }
+    const nx = c.x + c.vx * dt, ny = c.y + c.vy * dt;
+    if (get(Math.floor(nx / T), Math.floor(ny / T)) === SHALLOW && ny > 5 * T && ny < 62 * T) { c.x = nx; c.y = ny; } else { c.vx *= -1; c.vy *= -1; }
+    if (running && !busy && d < 26) {
+      c.caught = true; crayCount++; emoji("🦞", c.x, c.y - 20); toast(crayCount === 1 ? "Поймал! Кладём в ведро 🪣" : `Поймано раков: ${crayCount}`);
+      task.list[0].label = `Поймано раков: ${crayCount} / 6`; if (crayCount >= 6) task.list[0].done = true; renderTask();
+      if (crayCount >= 6) { player.item = "bucket"; run(sCrayDone); }
+    }
+  }
+  // подбираем предметы
+  if (running && !busy) {
+    for (const p of pickups) {
+      if (p.taken || Math.hypot(player.x - p.x, player.y - p.y) > 28) continue;
+      if (p.group === "mush" && p.kind === "bad") { if (!p.warned || time - p.warned > 3) { p.warned = time; toast("Это мухомор, он ядовитый! Не берём 🍄"); } continue; }
+      p.taken = true;
+      if (p.group === "pack") { emoji(p.icon, p.x, p.y - 20); toast(p.label + " — в рюкзаке!"); task.list.find((i) => i.id === p.id).done = true; renderTask(); }
+      if (p.group === "sticks") { emoji(p.icon, p.x, p.y - 20); const n = pickups.filter((q) => q.group === "sticks" && q.taken).length; task.list[0].label = `Палки и сушёные листья: ${n} / 8`; renderTask(); }
+      if (p.group === "mush") { mushCount++; emoji("🍄", p.x, p.y - 20); toast("Хороший гриб! 🍄‍🟫"); task.list[0].label = `Съедобные грибы: ${mushCount} / 5`; if (mushCount >= 5) task.list[0].done = true; renderTask(); }
+    }
+    const left = (g) => pickups.some((p) => p.group === g && !p.taken && !(g === "mush" && p.kind === "bad"));
+    const d = (x, y) => Math.hypot(player.x - x * T, player.y - y * T) / T;
+    if (stage === "pack" && !left("pack")) run(sPacked);
+    else if (stage === "mama" && d(21, 13) < 3) run(sMama);
+    else if (stage === "amira" && d(10, 12.5) < 3) run(sAmira);
+    else if (stage === "river" && d(13, 28.5) < 3.5) run(sSwim);
+    else if (stage === "road") {
+      if (!flags.hungry && player.x > 30 * T) { flags.hungry = true; run(sHungry); }
+      else if (!flags.spirt && player.x > 38 * T) { flags.spirt = true; run(sSpirt); }
+      else if (!flags.hill && player.x > 47 * T) { flags.hill = true; run(sHill); }
+      else if (player.x > 57 * T) run(sForestEdge);
+    }
+    else if (stage === "findCamp" && d(CAMP.x + 1, CAMP.y - 1) < 4) run(sCamp);
+    else if (stage === "sticks" && !left("sticks")) run(sFire);
+    else if (stage === "mushrooms" && mushCount >= 5) run(sToRiver);
+    else if (stage === "toRiver" && player.x > 90 * T) run(sRiver);
+    else if (stage === "backCamp" && d(CAMP.x, CAMP.y) < 3) run(sSoup);
+    else if (stage === "findBag" && d(CAMP.x + 3, CAMP.y + 3) < 1.6) run(sLeaves);
+    else if (stage === "deep") { if (!flags.rain && player.y > 41 * T) { flags.rain = true; run(sRain); } else if (flags.rain && d(CAVE.x, CAVE.y) < 5) run(sCave); }
+    else if (stage === "home") {
+      if (!flags.spirt2 && player.x < 50 * T) { flags.spirt2 = true; run(sSpirt2); }
+      else if (player.x < 32 * T) run(sNearHome);
+    }
+    else if (stage === "window" && d(8.5, 24) < 2) run(sFinal);
+  }
+}
+
+// ============ Рисование ============
+const SPR = {};
+const HGT = { romomeo: 80, omeshkin: 82, pelmeshkin: 80, amira: 88, mama: 100, monster: 330, kitten: 34, kittenEar: 34 };
+const HAND = { buff: 152, thin: 128, normal: 134.5, coat: 139, chubby: 143.5 };
+function rasterize(key, text, w, h, scale) {
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => { const c = document.createElement("canvas"); c.width = Math.round(w * scale); c.height = Math.round(h * scale); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); SPR[key] = c; res(); };
+    img.onerror = () => res();
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(text);
+  });
+}
+const faceURL = (inner, ring) => "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgDoc(140, 140, `<circle cx="100" cy="70" r="70" fill="${ring}"/>` + inner, "30 0 140 140"));
+function loadArt() {
+  const ring = { romomeo: "#7ad17a", omeshkin: "#9fc0ff", pelmeshkin: "#ffe08a", amira: "#d7c2f5", mama: "#a8e0d6" };
+  const jobs = Object.keys(ring).map((k) => { FACES[k] = faceURL(person(CHAR[k]), ring[k]); return rasterize(k, svgDoc(200, 270, person(k === "mama" ? { ...CHAR.mama, extra: apron + fryingPan } : CHAR[k])), 200, 270, 0.9); });
+  FACES.monster = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgDoc(140, 140, `<circle cx="120" cy="100" r="70" fill="#1b2a4a"/>` + blueMonster(), "50 30 140 140"));
+  jobs.push(rasterize("monster", svgDoc(240, 260, blueMonster(false)), 240, 260, 1.2));
+  jobs.push(rasterize("monsterSleep", svgDoc(240, 260, blueMonster(true)), 240, 260, 1.2));
+  jobs.push(rasterize("kitten", svgDoc(200, 160, kitten(0, false)), 200, 160, 0.5));
+  jobs.push(rasterize("kittenEar", svgDoc(200, 160, kitten(0, true)), 200, 160, 0.5));
+  jobs.push(rasterize("cray", svgDoc(200, 120, crayfish(100, 70, 1, false)), 200, 120, 0.4));
+  return Promise.all(jobs);
+}
+
+function vnoise(x, y, s) {
+  const gx = Math.floor(x / s), gy = Math.floor(y / s), fx = x / s - gx, fy = y / s - gy;
+  const r = (i, j) => (hash(i * 7 + 3, j * 13 + 5) % 1000) / 1000, sm = (t) => t * t * (3 - 2 * t);
+  const a = r(gx, gy) + (r(gx + 1, gy) - r(gx, gy)) * sm(fx), b = r(gx, gy + 1) + (r(gx + 1, gy + 1) - r(gx, gy + 1)) * sm(fx);
+  return a + (b - a) * sm(fy);
+}
+const mix = (c1, c2, t) => "rgb(" + c1.map((v, i) => Math.round(v + (c2[i] - v) * t)).join(",") + ")";
+const BASE = {
+  [GRASS]: [[108, 184, 92], [74, 150, 72]], [FOREST]: [[58, 112, 62], [40, 88, 50]], [PATH]: [[196, 160, 110], [176, 140, 92]], [SAND]: [[236, 212, 150], [220, 192, 128]],
+  [FLOOR]: [[196, 146, 96], [180, 132, 84]], [WALL]: [[176, 132, 92], [176, 132, 92]], [WIN]: [[176, 132, 92], [176, 132, 92]], [WATER]: [[62, 140, 206], [38, 104, 176]],
+  [SHALLOW]: [[112, 196, 226], [86, 176, 214]], [HILL]: [[150, 206, 110], [96, 164, 82]],
+};
+const tileFill = new Array(W * H);
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const t = map[at(x, y)];
+  let n = vnoise(x, y, 5) * 0.75 + vnoise(x, y, 2) * 0.25;
+  if (t === HILL) n = Math.min(1, Math.hypot(x - HILLC.x, (y - HILLC.y) * 1.3) / HILLC.r);
+  tileFill[at(x, y)] = mix(BASE[t][0], BASE[t][1], n);
+}
+function drawTile(t, x, y) {
+  const px = x * T, py = y * T, h = hash(x, y);
+  ctx.fillStyle = tileFill[at(x, y)]; ctx.fillRect(px, py, T + 0.6, T + 0.6);
+  if (t === GRASS || t === HILL) {
+    if (h % 6 === 0) { ctx.fillStyle = ["#fff27a", "#ff9ec4", "#ffffff", "#b9a6ff"][h % 4]; const fx = px + (h % 22) + 5, fy = py + ((h >> 5) % 20) + 6; ctx.beginPath(); ctx.arc(fx, fy, 2.6, 0, 7); ctx.fill(); }
+    if (h % 3 === 0) { ctx.strokeStyle = "rgba(30,90,40,.4)"; ctx.lineWidth = 1.5; const gx = px + (h % 26) + 3, gy = py + ((h >> 4) % 22) + 8;
+      ctx.beginPath(); ctx.moveTo(gx, gy); ctx.lineTo(gx - 2, gy - 6); ctx.moveTo(gx + 2, gy); ctx.lineTo(gx + 3, gy - 7); ctx.moveTo(gx + 4, gy); ctx.lineTo(gx + 7, gy - 5); ctx.stroke(); }
+  } else if (t === FOREST) {
+    if (h % 4 === 0) { ctx.fillStyle = "rgba(20,50,25,.35)"; ctx.beginPath(); ctx.ellipse(px + (h % 24) + 4, py + ((h >> 3) % 24) + 4, 5, 3, 0, 0, 7); ctx.fill(); }
+    if (h % 9 === 0) { ctx.fillStyle = ["#c9772e", "#d9a441", "#a8502a"][h % 3]; ctx.beginPath(); ctx.ellipse(px + (h % 20) + 6, py + ((h >> 4) % 20) + 6, 3, 2, h, 0, 7); ctx.fill(); }
+  } else if (t === PATH) {
+    if (h % 5 === 0) { ctx.fillStyle = "rgba(120,90,60,.35)"; ctx.beginPath(); ctx.ellipse(px + (h % 22) + 5, py + ((h >> 3) % 22) + 5, 3, 2, 0, 0, 7); ctx.fill(); }
+  } else if (t === FLOOR) {
+    ctx.fillStyle = "rgba(90,60,30,.25)"; ctx.fillRect(px, py + 15, T + 0.6, 1.5); ctx.fillRect(px + ((y % 2) ? 10 : 24), py, 1.5, 15); ctx.fillRect(px + ((y % 2) ? 4 : 18), py + 16, 1.5, 16);
+  } else if (t === SHALLOW || t === WATER) {
+    const o = Math.sin(time * 1.6 + x * 0.7 + y * 0.4) * 5;
+    if (h % 3 === 0) { ctx.strokeStyle = "rgba(255,255,255,.3)"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(px + 5 + o, py + 16); ctx.quadraticCurveTo(px + 12 + o, py + 10, px + 19 + o, py + 16); ctx.stroke(); }
+    if (t === SHALLOW && h % 7 === 0) { ctx.fillStyle = "rgba(230,210,150,.5)"; ctx.beginPath(); ctx.ellipse(px + (h % 22) + 5, py + ((h >> 3) % 22) + 5, 3, 2, 0, 0, 7); ctx.fill(); }
+    ctx.fillStyle = `rgba(255,255,255,${0.35 + 0.15 * Math.sin(time * 2 + x + y)})`;
+    const land = (i, j) => { const n = get(x + i, y + j); return n !== WATER && n !== SHALLOW; };
+    if (land(0, -1)) ctx.fillRect(px, py, T + 0.6, 3); if (land(0, 1)) ctx.fillRect(px, py + T - 3, T + 0.6, 3);
+    if (land(-1, 0)) ctx.fillRect(px, py, 3, T + 0.6); if (land(1, 0)) ctx.fillRect(px + T - 3, py, 3, T + 0.6);
+  } else if (t === WALL || t === WIN) {
+    ctx.fillStyle = "#e0c29a"; ctx.fillRect(px, py, T + 0.6, 10);
+    ctx.fillStyle = "#8a6440"; ctx.fillRect(px, py + T - 3, T + 0.6, 3);
+    if (t === WIN) { ctx.fillStyle = night > 0.3 ? "#ffe38a" : "#9ad8f6"; ctx.fillRect(px + 4, py + 12, T - 8, T - 17); ctx.fillStyle = "#fff"; ctx.fillRect(px + T / 2 - 1, py + 12, 2, T - 17); }
+  }
+}
+function ell(x, y, rx, ry, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+function box(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+function rbox(x, y, w, h, r, c, stroke) { ctx.fillStyle = c; ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fill(); if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = 2; ctx.stroke(); } }
+const INK = "#2a1d14";
+
+function drawObj(o) {
+  const { x, y } = o;
+  if (o.type === "tree") {
+    ell(x + 8, y - 2, 22, 8, "rgba(0,0,0,.2)");
+    const dk = o.dark ? 0.8 : 1;
+    if (o.v > 0.45 || o.dark && o.v > 0.3) {
+      rbox(x - 4, y - 16, 8, 16, 2, "#6b4a2b");
+      for (let i = 0; i < 3; i++) {
+        const w = 26 - i * 6, top = y - 24 - i * 15;
+        ctx.fillStyle = i % 2 ? mix([47, 122, 68], [20, 60, 35], 1 - dk) : mix([39, 105, 58], [15, 50, 30], 1 - dk);
+        ctx.beginPath(); ctx.moveTo(x - w, top + 4); ctx.lineTo(x, top - 24); ctx.lineTo(x + w, top + 4); ctx.closePath(); ctx.fill();
+      }
+    } else {
+      rbox(x - 5, y - 24, 10, 24, 3, "#7a5230");
+      const s = 1 + o.v * 0.4;
+      ell(x, y - 36 * s, 21 * s, 18 * s, o.dark ? "#2a6634" : "#2f7a3a"); ell(x - 9 * s, y - 42 * s, 13 * s, 11 * s, o.dark ? "#347a40" : "#3c9447");
+      ell(x + 9 * s, y - 44 * s, 12 * s, 10 * s, o.dark ? "#347a40" : "#3c9447"); ell(x - 4 * s, y - 50 * s, 10 * s, 8 * s, o.dark ? "#428d4a" : "#52ad5a");
+    }
+  } else if (o.type === "table") {
+    ell(x, y - 2, 52, 8, "rgba(0,0,0,.18)");
+    rbox(x - 48, y - 58, 96, 50, 6, "#8a5a2b", INK); box(x - 44, y - 54, 88, 4, "#a8703e");
+    [[-30, -40], [0, -44], [28, -38]].forEach(([dx, dy]) => { rbox(x + dx - 6, y + dy, 12, 10, 3, "#fff", INK); box(x + dx - 4, y + dy + 2, 8, 3, "#b86b2a"); });
+    ell(x + 10, y - 26, 12, 6, "#e8e0d0"); ell(x + 10, y - 27, 7, 3, "#d9a441");
+  } else if (o.type === "sofa") {
+    rbox(x - 18, y - 96, 36, 96, 8, "#5a7fc9", INK); rbox(x - 18, y - 96, 12, 96, 6, "#4a6db3");
+  } else if (o.type === "stove") {
+    rbox(x - 30, y - 40, 60, 40, 4, "#e8e8ee", INK); ell(x - 14, y - 30, 9, 5, "#333"); ell(x + 14, y - 30, 9, 5, "#333");
+    ell(x - 14, y - 32, 12, 7, "#3a3a44"); box(x - 30, y - 34, 6, 3, "#6b4a2b");
+  } else if (o.type === "fridge") { rbox(x - 15, y - 56, 30, 56, 4, "#f4f6fb", INK); box(x + 8, y - 44, 3, 12, "#999"); box(x - 15, y - 34, 30, 2, "#ccd"); }
+  else if (o.type === "bed") {
+    rbox(x - 30, y - 94, 60, 94, 6, "#8a5a2b", INK); rbox(x - 26, y - 90, 52, 22, 6, "#fff"); rbox(x - 26, y - 62, 52, 56, 4, "#c9a2e8");
+  } else if (o.type === "wardrobe") { rbox(x - 30, y - 50, 60, 50, 3, "#7a4e2e", INK); box(x - 1, y - 46, 2, 42, INK); }
+  else if (o.type === "rug") { ell(x, y, 50, 18, "#c95a5a"); ell(x, y, 40, 13, "#e8a05a"); }
+  else if (o.type === "log") {
+    ell(x, y + 2, 56, 8, "rgba(0,0,0,.25)");
+    rbox(x - 52, y - 20, 104, 22, 10, "#7a5230", INK); ell(x + 50, y - 9, 8, 11, "#c9a070"); ell(x + 50, y - 9, 4, 6, "#a8804f");
+    box(x - 30, y - 16, 20, 2, "#5f3f22"); box(x + 4, y - 10, 24, 2, "#5f3f22"); ell(x - 20, y - 20, 8, 4, "#4f8a3a");
+  } else if (o.type === "sign") {
+    box(x - 2.5, y - 30, 5, 30, "#6b4a2b");
+    ctx.font = "600 12px Rubik, system-ui, sans-serif"; const w = ctx.measureText(o.text).width + 14;
+    rbox(x - w / 2, y - 48, w, 20, 4, "#e2bd7f", "#6b4a2b"); ctx.fillStyle = "#3a2410"; ctx.textAlign = "center"; ctx.fillText(o.text, x, y - 34);
+  } else if (o.type === "bottle") { rbox(x - 6, y - 24, 12, 24, 3, "#8fd18f", INK); box(x - 3, y - 32, 6, 9, "#8fd18f"); }
+  else if (o.type === "leaves") { for (let i = 0; i < 14; i++) ell(x + Math.sin(i * 2.3) * 26, y - 10 + Math.cos(i * 1.7) * 8 - (i % 3) * 5, 10, 6, ["#c9772e", "#d9a441", "#a8502a"][i % 3]); }
+}
+
+function drawSprite(a, key, hgt, handX) {
+  const img = SPR[key]; if (!img) return;
+  const w = (hgt * img.width) / img.height;
+  ctx.save(); ctx.translate(a.x + (a.shake > 0 ? (Math.random() - 0.5) * 6 : 0), a.y);
+  ctx.globalAlpha = a.alpha;
+  ell(0, 0, w * 0.34, Math.max(5, hgt * 0.04), "rgba(0,0,0,.22)");
+  const inWater = a.kind !== "monster" && get(Math.floor(a.x / T), Math.floor(a.y / T)) === SHALLOW;
+  if (a.lying) { ctx.translate(hgt / 2, -w * 0.32); ctx.rotate(-Math.PI / 2); }
+  if (a.moving) { ctx.translate(0, -Math.abs(Math.sin(a.phase)) * 4); ctx.rotate(Math.sin(a.phase) * 0.06); }
+  else if (!a.lying) ctx.scale(1, 1 + Math.sin(time * 2.2 + a.x) * 0.012);
+  ctx.scale(a.dir, 1);
+  if (inWater && !a.lying) {
+    const cut = 0.78; ctx.drawImage(img, 0, 0, img.width, img.height * cut, -w / 2, -hgt, w, hgt * cut);
+    ctx.fillStyle = "rgba(160,220,245,.6)"; ctx.beginPath(); ctx.ellipse(0, -hgt * 0.22, w * 0.45, 6, 0, 0, 7); ctx.fill();
+  } else ctx.drawImage(img, -w / 2, -hgt, w, hgt);
+  if (handX) {
+    const hx = ((handX - 100) / 200) * w, hy = -hgt + (196 / 270) * hgt;
+    if (a.item) { ctx.font = "20px system-ui"; ctx.textAlign = "center"; ctx.fillText({ bottle: "🍾", bucket: "🪣", kitten: "🐱" }[a.item] || "", hx + 4, hy + 8); }
+  }
+  ctx.restore();
+}
+function drawActor(a) {
+  if (a.hidden) return;
+  if (a.kind === "monster") {
+    const key = a.sleeping ? "monsterSleep" : "monster";
+    const h = following && followers.includes(a) ? 230 : a.stand ? HGT.monster : HGT.monster * 0.9;
+    drawSprite(a, key, h);
+    if (O.riding) { const o = { ...O, x: a.x, y: a.y - h * 0.84, dir: a.dir, moving: false, hidden: false, lying: false }; drawSprite(o, "omeshkin", HGT.omeshkin); }
+    return;
+  }
+  if (a.kind === "kitten" || a.kind === "kittenEar") return drawSprite(a, a.kind, HGT.kitten);
+  drawSprite(a, a.kind, HGT[a.kind], HAND[CHAR[a.kind].build]);
+}
+function drawPickup(p) {
+  const bob = Math.sin(time * 4 + p.x) * 3;
+  if (p.group === "mush") {
+    ell(p.x, p.y, 9, 3, "rgba(0,0,0,.2)");
+    box(p.x - 3, p.y - 12, 6, 12, "#f4ecd8");
+    ctx.fillStyle = p.kind === "bad" ? "#e0342e" : "#8a5a2b"; ctx.beginPath(); ctx.ellipse(p.x, p.y - 12, 12, 8, 0, Math.PI, 0); ctx.fill();
+    if (p.kind === "bad") { ell(p.x - 5, p.y - 15, 2, 2, "#fff"); ell(p.x + 4, p.y - 17, 2, 2, "#fff"); ell(p.x + 1, p.y - 13, 1.6, 1.6, "#fff"); }
+    return;
+  }
+  ctx.save(); ctx.globalAlpha = 0.35 + Math.sin(time * 5) * 0.15; ell(p.x, p.y - 12 + bob, 20, 20, "#fff6b0"); ctx.restore();
+  ctx.font = "26px system-ui"; ctx.textAlign = "center"; ctx.fillText(p.icon, p.x, p.y + bob);
+}
+
+const lc = document.createElement("canvas"), lx = lc.getContext("2d");
+function drawLighting(ox, oy) {
+  if (night <= 0.01) return;
+  if (lc.width !== cv.width || lc.height !== cv.height) { lc.width = cv.width; lc.height = cv.height; }
+  const k = Z * DPR;
+  lx.setTransform(1, 0, 0, 1, 0, 0); lx.globalCompositeOperation = "source-over"; lx.clearRect(0, 0, lc.width, lc.height);
+  lx.fillStyle = `rgba(6,10,34,${night})`; lx.fillRect(0, 0, lc.width, lc.height);
+  lx.globalCompositeOperation = "destination-out";
+  const lights = [];
+  if (torch && !player.hidden) lights.push({ x: player.x + player.dir * 60, y: player.y - 30, r: 190 }, { x: player.x, y: player.y - 30, r: 110 });
+  if (fire) lights.push({ x: fire.x, y: fire.y - 10, r: 240 + Math.sin(time * 13) * 10 + Math.sin(time * 7) * 8 });
+  if (stage === "window" || stage === "end") lights.push({ x: 15 * T, y: 16 * T, r: 360 });
+  for (const L of lights) {
+    const sx = (L.x - ox) * k, sy = (L.y - oy) * k, r = L.r * k;
+    const g = lx.createRadialGradient(sx, sy, 0, sx, sy, r);
+    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(0.55, "rgba(0,0,0,.75)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    lx.fillStyle = g; lx.beginPath(); lx.arc(sx, sy, r, 0, 7); lx.fill();
+  }
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(lc, 0, 0); ctx.restore();
+  if (fire) { const sx = (fire.x - ox) * Z, sy = (fire.y - oy) * Z; const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, 200 * Z); g.addColorStop(0, "rgba(255,150,40,.25)"); g.addColorStop(1, "rgba(255,150,40,0)"); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
+}
+function drawFire(x, y) {
+  if (stones) for (let i = 0; i < 3; i++) ell(x + Math.cos(i * 2.1) * 16, y + Math.sin(i * 2.1) * 6, 8, 6, "#8d8a99");
+  if (!fire) { if (stones) { box(x - 10, y - 4, 20, 4, "#5a3a1e"); } return; }
+  box(x - 14, y - 4, 28, 5, "#5a3a1e"); box(x - 4, y - 8, 8, 10, "#6b4a2b");
+  for (let i = 0; i < 3; i++) {
+    const f = Math.sin(time * 12 + i * 2) * 3;
+    ctx.fillStyle = ["#ff5a1f", "#ffae2e", "#fff2a8"][i];
+    const s = 1 - i * 0.28;
+    ctx.beginPath(); ctx.moveTo(x - 14 * s, y); ctx.quadraticCurveTo(x - 10 * s, y - 24 * s + f, x + f * 0.5, y - 40 * s + f); ctx.quadraticCurveTo(x + 10 * s, y - 24 * s - f, x + 14 * s, y); ctx.fill();
+  }
+  if (steam) { rbox(x - 16, y - 30, 32, 22, 6, "#3a3a44", INK); for (let i = 0; i < 3; i++) { ctx.globalAlpha = 0.4; ell(x - 8 + i * 8, y - 40 - ((time * 30 + i * 10) % 30), 6, 5, "#fff"); ctx.globalAlpha = 1; } }
+}
+function drawTent(x, y) {
+  ell(x, y, 42, 8, "rgba(0,0,0,.2)");
+  ctx.fillStyle = "#e2553f"; ctx.beginPath(); ctx.moveTo(x - 40, y); ctx.lineTo(x, y - 52); ctx.lineTo(x + 40, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#b83a28"; ctx.beginPath(); ctx.moveTo(x, y - 52); ctx.lineTo(x + 40, y); ctx.lineTo(x + 8, y); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = "#3a1a10"; ctx.beginPath(); ctx.moveTo(x - 10, y); ctx.lineTo(x, y - 30); ctx.lineTo(x + 8, y); ctx.fill();
+}
+
+const clouds = Array.from({ length: 8 }, () => ({ x: rnd() * W * T, y: rnd() * H * T, r: 140 + rnd() * 160, s: 10 + rnd() * 12 }));
+const drops = Array.from({ length: 140 }, () => ({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.6 }));
+function draw() {
+  ctx.fillStyle = "#1b3f6e"; ctx.fillRect(0, 0, VW, VH);
+  const vw = VW / Z, vh = VH / Z;
+  const sx = (Math.random() - 0.5) * camShake, sy = (Math.random() - 0.5) * camShake;
+  const cx = Math.max(vw / 2, Math.min(W * T - vw / 2, cam.x)), cy = Math.max(vh / 2, Math.min(H * T - vh / 2, cam.y));
+  const ox = cx - vw / 2, oy = cy - vh / 2;
+  ctx.save(); ctx.scale(Z, Z); ctx.translate(-ox + sx, -oy + sy);
+  const x0 = Math.max(0, Math.floor(ox / T)), x1 = Math.min(W - 1, Math.ceil((ox + vw) / T)), y0 = Math.max(0, Math.floor(oy / T)), y1 = Math.min(H - 1, Math.ceil((oy + vh) / T));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) drawTile(map[at(x, y)], x, y);
+  objs.filter((o) => o.flat).forEach(drawObj);
+  const inView = (o) => o.x > ox - 200 && o.x < ox + vw + 200 && o.y > oy - 40 && o.y < oy + vh + 400;
+  for (const p of pickups) if (!p.taken && inView(p)) drawPickup(p);
+  for (const c of crays) if (!c.caught && inView(c)) { const img = SPR.cray; if (img) { ctx.save(); ctx.translate(c.x, c.y); ctx.scale(c.vx > 0 ? -1 : 1, 1); ctx.drawImage(img, -24, -16, 48, 29); ctx.restore(); } }
+  const list = [...objs.filter((o) => !o.flat && inView(o)).map((o) => ({ y: o.y, d: () => drawObj(o) })),
+                ...actors.filter((a) => !a.hidden && inView(a)).map((a) => ({ y: a.y, d: () => drawActor(a) }))];
+  if (stones || fire) list.push({ y: CAMP.y * T + 14, d: () => drawFire(CAMP.x * T, (CAMP.y + 0.4) * T) });
+  if (tent) list.push({ y: (CAMP.y - 0.3) * T, d: () => drawTent((CAMP.x - 3) * T, (CAMP.y - 0.3) * T) });
+  list.sort((a, b) => a.y - b.y).forEach((o) => o.d());
+  ctx.font = "600 12px Rubik, system-ui, sans-serif"; ctx.textAlign = "center";
+  for (const a of [O, P, A, M]) {
+    if (a.hidden || a.lying || Math.hypot(a.x - player.x, a.y - player.y) > 6 * T) continue;
+    const top = a.y - HGT[a.kind] - 8, w = ctx.measureText(NAMES[a.kind]).width + 10;
+    ctx.fillStyle = "rgba(0,0,0,.5)"; ctx.fillRect(a.x - w / 2, top - 12, w, 16); ctx.fillStyle = "#fff"; ctx.fillText(NAMES[a.kind], a.x, top);
+  }
+  for (const a of speakers) {
+    if (a.hidden) continue;
+    const top = a.y - (HGT[a.kind] || 60) - 28 + Math.sin(time * 6) * 3;
+    ctx.fillStyle = "#ffcf6b"; ctx.beginPath(); ctx.moveTo(a.x - 7, top); ctx.lineTo(a.x + 7, top); ctx.lineTo(a.x, top + 9); ctx.fill();
+  }
+  if (night < 0.3) for (const c of clouds) {
+    const x = ((c.x + time * c.s) % (W * T + 600)) - 300;
+    if (x + c.r < ox || x - c.r > ox + vw || c.y + c.r < oy || c.y - c.r > oy + vh) continue;
+    ell(x, c.y, c.r, c.r * 0.55, "rgba(20,30,70,.06)");
+  }
+  ctx.font = "22px system-ui";
+  for (const p of particles) { ctx.globalAlpha = Math.min(1, p.life); ctx.fillText(p.ch, p.x, p.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (tint === "sunset") { const g = ctx.createLinearGradient(0, 0, 0, VH); g.addColorStop(0, "rgba(255,120,60,.28)"); g.addColorStop(1, "rgba(120,40,120,.22)"); ctx.fillStyle = g; ctx.fillRect(0, 0, VW, VH); }
+  drawLighting(ox - sx, oy - sy);
+  if (raining) {
+    ctx.strokeStyle = "rgba(170,200,255,.5)"; ctx.lineWidth = 1.5; ctx.beginPath();
+    for (const d of drops) { d.y += d.v * 0.02; if (d.y > 1) { d.y = 0; d.x = Math.random(); } const x = d.x * VW, y = d.y * VH; ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 14); }
+    ctx.stroke();
+  }
+  const vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.35, VW / 2, VH / 2, Math.max(VW, VH) * 0.75);
+  vg.addColorStop(0, "rgba(10,12,40,0)"); vg.addColorStop(1, "rgba(10,12,40,.35)"); ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH);
+
+  if (running && obj && !busy) drawArrow(obj.x, obj.y, ox, oy);
+  if (stick.on && !busy) {
+    ctx.strokeStyle = "rgba(255,255,255,.4)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 50, 0, 7); ctx.stroke();
+    const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.min(50, Math.hypot(dx, dy)), an = Math.atan2(dy, dx);
+    ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.beginPath(); ctx.arc(stick.ox + Math.cos(an) * d, stick.oy + Math.sin(an) * d, 20, 0, 7); ctx.fill();
+  }
+  drawMini();
+}
+function drawArrow(wx, wy, ox, oy) {
+  const sx = (wx - ox) * Z, sy = (wy - oy) * Z, m = 40;
+  ctx.fillStyle = "#ffcf6b"; ctx.strokeStyle = "#1a1a2e"; ctx.lineWidth = 2;
+  if (sx > m && sx < VW - m && sy > m + 60 && sy < VH - m) {
+    const y = sy - 60 + Math.sin(time * 5) * 6;
+    ctx.beginPath(); ctx.moveTo(sx - 12, y); ctx.lineTo(sx + 12, y); ctx.lineTo(sx, y + 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    const cx = VW / 2, cy = VH / 2, an = Math.atan2(sy - cy, sx - cx);
+    const k = Math.min((VW / 2 - m) / Math.abs(Math.cos(an) || 1e-6), (VH / 2 - m) / Math.abs(Math.sin(an) || 1e-6));
+    ctx.save(); ctx.translate(cx + Math.cos(an) * k, cy + Math.sin(an) * k); ctx.rotate(an);
+    ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -13); ctx.lineTo(-4, 0); ctx.lineTo(-10, 13); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+}
+const miniBase = document.createElement("canvas"); miniBase.width = W; miniBase.height = H;
+{ const m = miniBase.getContext("2d"), img = m.createImageData(W, H);
+  const C = { [WATER]: [45, 111, 181], [GRASS]: [100, 176, 88], [PATH]: [196, 160, 110], [SAND]: [236, 212, 150], [FLOOR]: [196, 146, 96], [WALL]: [120, 90, 60], [WIN]: [150, 200, 230],
+    [FOREST]: [50, 100, 58], [SHALLOW]: [112, 196, 226], [HILL]: [140, 200, 104] };
+  for (let i = 0; i < W * H; i++) { const c = solidObj[i] && map[i] === FOREST ? [30, 72, 40] : C[map[i]]; img.data.set([...c, 255], i * 4); }
+  m.putImageData(img, 0, 0); }
+const mini = document.getElementById("mini").getContext("2d");
+function drawMini() {
+  mini.drawImage(miniBase, 0, 0);
+  const dot = (x, y, c, r = 1.5) => { mini.fillStyle = c; mini.fillRect(x / T - r, y / T - r, r * 2, r * 2); };
+  if (obj && Math.sin(time * 6) > 0) dot(obj.x, obj.y, "#ffcf6b", 2.5);
+  if (!MON.hidden) dot(MON.x, MON.y, "#4a90e2", 2.5);
+  dot(player.x, player.y, "#ffffff", 2);
+}
+
+// ============ Запуск ============
+objective("Сидим за столом, пьём чай...", null);
+document.getElementById("play").onclick = () => { $("#start").style.display = "none"; running = true; run(sIntro); };
+document.getElementById("roam").onclick = () => { $("#end").style.display = "none"; };
+loadArt().then(() => {
+  $("#cast").innerHTML = ["romomeo", "omeshkin", "pelmeshkin"].map((k) => `<img src="${FACES[k]}" alt="${NAMES[k]}">`).join("");
+  const b = document.getElementById("play"); b.disabled = false; b.textContent = "▶ Начать";
+});
+let last = performance.now();
+function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (running) update(dt); draw(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
