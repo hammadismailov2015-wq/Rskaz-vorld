@@ -37,9 +37,9 @@ function bg(kind, w, h) {
 // ---------- человек ----------
 function person(o) {
   const S = o.skin, SD = shade(S, 0.82), SH = o.shirt, SHD = shade(SH, 0.8);
-  const sw = { buff: 46, thin: 27, normal: 32, coat: 36 }[o.build];      // полуширина плеч
-  const ww = { buff: 30, thin: 23, normal: 28, coat: 34 }[o.build];      // полуширина пояса
-  const aw = { buff: 22, thin: 12, normal: 15, coat: 16 }[o.build];      // толщина руки
+  const sw = { buff: 46, thin: 27, normal: 32, coat: 36, chubby: 40 }[o.build];      // полуширина плеч
+  const ww = { buff: 30, thin: 23, normal: 28, coat: 34, chubby: 46 }[o.build];      // полуширина пояса
+  const aw = { buff: 22, thin: 12, normal: 15, coat: 16, chubby: 17 }[o.build];      // толщина руки
   const lx = 100 - sw - aw + 5, rx = 100 + sw - 5;
   let s = `<ellipse cx="100" cy="258" rx="${sw + 22}" ry="9" fill="#000" opacity=".18"/>`;
   if (o.backHair) s += o.backHair();
@@ -73,6 +73,10 @@ function person(o) {
     s += `<path d="M${100 - sw} 136 Q${100 - sw} 122 ${100 - sw + 12} 122 L${100 + sw - 12} 122 Q${100 + sw} 122 ${100 + sw} 136 L${100 + ww} 196 L${100 - ww} 196 Z"
             fill="${SH}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
           <path d="M${100 + sw - 14} 124 Q${100 + sw} 124 ${100 + sw} 136 L${100 + ww} 196 L${100 + ww - 16} 196 Z" fill="${SHD}" opacity=".6"/>`;
+    if (o.build === "chubby") s += `<ellipse cx="100" cy="174" rx="${ww + 2}" ry="30" fill="${SH}"/>
+          <path d="M${100 - ww - 2} 174 A${ww + 2} 30 0 0 0 ${100 + ww + 2} 174" stroke="${OUT}" stroke-width="3" fill="none"/>
+          <path d="M${100 - ww - 1} 172 Q${100 - ww - 4} 150 ${100 - sw} 136 M${100 + ww + 1} 172 Q${100 + ww + 4} 150 ${100 + sw} 136" stroke="${OUT}" stroke-width="3" fill="none"/>
+          <path d="M${100 + ww - 16} 150 Q${100 + ww} 172 ${100 + ww - 14} 196" stroke="${SHD}" stroke-width="10" fill="none" opacity=".6"/>`;
     if (o.build === "buff") s += `<path d="M78 146 q11 9 21 0 M101 146 q11 9 21 0" stroke="${SHD}" stroke-width="3" fill="none"/>`;
     if (o.stripe) s += `<rect x="${100 - sw + 2}" y="150" width="${sw * 2 - 4}" height="8" fill="${o.stripe}" opacity=".9"/>`;
     if (o.build === "coat") s += `<path d="M100 124 V196" stroke="${OUT}" stroke-width="2.5"/>
@@ -102,6 +106,7 @@ function person(o) {
   s += `<path d="M98 97 q3 5 -1 7" stroke="${SD}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
   if (o.mustache) s += `<path d="M80 108 q10 -9 20 -3 q10 -6 20 3 q-10 4 -20 -1 q-10 5 -20 1Z" fill="#5a4030" stroke="${OUT}" stroke-width="2"/>`;
   else s += o.mouth || `<path d="M88 108 Q100 120 112 108 Z" fill="#8a2a2a" stroke="${OUT}" stroke-width="2.5" stroke-linejoin="round"/><path d="M92 110 h16" stroke="#fff" stroke-width="3"/>`;
+  if (o.build === "chubby") s += `<path d="M80 121 Q100 131 120 121" stroke="${SD}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
   s += `<ellipse cx="72" cy="102" rx="7" ry="4" fill="#ff7a7a" opacity="${o.blush ?? 0.35}"/><ellipse cx="128" cy="102" rx="7" ry="4" fill="#ff7a7a" opacity="${o.blush ?? 0.35}"/>`;
   if (o.beard) s += `<path d="M66 100 Q70 130 100 132 Q130 130 134 100 Q124 118 100 120 Q76 118 66 100Z" fill="${o.beard}" stroke="${OUT}" stroke-width="2.5"/>
                      <path d="M88 110 Q100 118 112 110" stroke="${OUT}" stroke-width="2.5" fill="none"/>`;
@@ -321,10 +326,10 @@ function crayfish(x, y, sc, flip) {
 }
 
 Object.assign(CHAR, {
-  romomeo: { ...CHAR.roma, shirt: "#3f8f5a", stripe: "#f2c14e", logo: "🧭" },
-  omeshkin: { skin: "#f1c9a5", shirt: "#ff7ab0", pants: "#4a5a8a", shoes: "#ffffff", build: "normal", hair: hairMessy("#3a2618"), iris: "#5a3a1a", logo: "🍬" },
-  pelmeshkin: { skin: "#e9b98f", shirt: "#f2c14e", pants: "#6b4a2b", shoes: "#3a3a44", build: "normal", hair: hairCurly("#d9a441"), iris: "#3a6a3a", logo: "🥟",
-    brows: "M74 70 q9 -7 19 0 M107 70 q10 -7 19 0" },
+  romomeo: { skin: "#f1c9a5", shirt: "#3f8f5a", stripe: "#f2c14e", pants: "#4a4a3a", shoes: "#6b4a2b", build: "normal", hair: hairMessy("#1f1a18"), iris: "#4a2c16", logo: "🧭", blush: 0.25 },
+  omeshkin: { skin: "#f1c9a5", shirt: "#3f6fd6", pants: "#3a3a48", shoes: "#2c2c33", build: "chubby", hair: hairMessy("#3a2618"), iris: "#5a3a1a", logo: "🍬", blush: 0.3 },
+  pelmeshkin: { skin: "#e9b98f", shirt: "#f2c14e", pants: "#6b4a2b", shoes: "#3a3a44", build: "normal", hair: hairMessy("#b7773a"), iris: "#3a6a3a", logo: "🥟",
+    browColor: "#8a5424", brows: "M74 70 q9 -7 19 0 M107 70 q10 -7 19 0" },
   amira: { skin: "#f3cfb0", shirt: "#9b6fd6", trim: "#ffcf6b", build: "thin", robe: true, hair: hairLong("#2a1a12"), backHair: hairLongBack("#2a1a12"), iris: "#4a2c16", blush: 0.45,
     mouth: `<path d="M90 108 Q100 116 110 108" stroke="${OUT}" stroke-width="3" fill="none" stroke-linecap="round"/>` },
   mama: { skin: "#f0c8a4", shirt: "#4f9d8f", trim: "#2f6f63", build: "normal", robe: true, hair: hairBun("#4a2a1a"), iris: "#4a2c16", blush: 0.4, extra: apron,
