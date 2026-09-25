@@ -42,216 +42,8 @@
 <div class="grid" id="foes"></div>
 <footer></footer>
 
+<script src="art.js"></script>
 <script>
-// ---------- помощники ----------
-const OUT = "#2a1d14";
-function shade(hex, k) {
-  const n = parseInt(hex.slice(1), 16);
-  const f = (c) => Math.max(0, Math.min(255, Math.round(c * k)));
-  return "#" + [f(n >> 16), f((n >> 8) & 255), f(n & 255)].map((c) => c.toString(16).padStart(2, "0")).join("");
-}
-let uid = 0;
-function bg(kind, w, h) {
-  const id = "bg" + uid++;
-  const sets = {
-    street: ["#9fd4f5", "#dff1fb", `<rect y="${h * 0.72}" width="${w}" height="${h}" fill="#b9b4a8"/><rect y="${h * 0.72}" width="${w}" height="4" fill="#a7a296"/>
-      <rect x="${w * 0.06}" y="${h * 0.38}" width="${w * 0.28}" height="${h * 0.34}" fill="#f0c9c0" opacity=".55"/><polygon points="${w * 0.03},${h * 0.4} ${w * 0.2},${h * 0.26} ${w * 0.37},${h * 0.4}" fill="#a04a3a" opacity=".5"/>
-      <rect x="${w * 0.68}" y="${h * 0.42}" width="${w * 0.26}" height="${h * 0.3}" fill="#c9e0f0" opacity=".6"/><polygon points="${w * 0.65},${h * 0.44} ${w * 0.81},${h * 0.31} ${w * 0.97},${h * 0.44}" fill="#4a5a8a" opacity=".5"/>`],
-    arena: ["#f3c77a", "#fbe2ae", `<rect y="${h * 0.72}" width="${w}" height="${h}" fill="#d8b26a"/><rect y="${h * 0.3}" width="${w}" height="${h * 0.42}" fill="#8d8a99" opacity=".35"/>
-      ${Array.from({ length: 12 }, (_, i) => `<circle cx="${(i + 0.5) * w / 12}" cy="${h * 0.38 + (i % 2) * 8}" r="7" fill="${["#e25a5a", "#5a8ee2", "#e2c25a", "#7ad17a"][i % 4]}" opacity=".5"/>`).join("")}`],
-    desert: ["#ffb36b", "#ffe4a8", `<circle cx="${w * 0.8}" cy="${h * 0.2}" r="${w * 0.08}" fill="#fff4c2"/><path d="M0 ${h * 0.7} Q${w * 0.3} ${h * 0.6} ${w * 0.6} ${h * 0.68} T${w} ${h * 0.64} V${h} H0Z" fill="#e2c07a"/>
-      <rect x="${w * 0.12}" y="${h * 0.45}" width="8" height="${h * 0.24}" rx="4" fill="#3e8f4a" opacity=".7"/>`],
-  };
-  const [top, bottom, deco] = sets[kind];
-  return `<defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient></defs>
-    <rect width="${w}" height="${h}" fill="url(#${id})"/>${deco}`;
-}
-
-// ---------- человек ----------
-function person(o) {
-  const S = o.skin, SD = shade(S, 0.82), SH = o.shirt, SHD = shade(SH, 0.8);
-  const sw = { buff: 46, thin: 27, normal: 32, coat: 36 }[o.build];      // полуширина плеч
-  const ww = { buff: 30, thin: 23, normal: 28, coat: 34 }[o.build];      // полуширина пояса
-  const aw = { buff: 22, thin: 12, normal: 15, coat: 16 }[o.build];      // толщина руки
-  const lx = 100 - sw - aw + 5, rx = 100 + sw - 5;
-  let s = `<ellipse cx="100" cy="258" rx="${sw + 22}" ry="9" fill="#000" opacity=".18"/>`;
-
-  // ноги
-  if (o.robe) {
-    s += `<path d="M${100 - sw} 128 L${100 - ww - 18} 252 L${100 + ww + 18} 252 L${100 + sw} 128 Z" fill="${SH}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
-          <path d="M100 150 L${100 + ww + 18} 252 L${100 + sw} 128 Z" fill="${SHD}" opacity=".35"/>
-          <path d="M${100 - ww - 18} 236 L${100 + ww + 18} 236" stroke="${o.trim}" stroke-width="7"/>
-          <ellipse cx="84" cy="255" rx="14" ry="6" fill="#6b4a2b" stroke="${OUT}" stroke-width="2.5"/><ellipse cx="116" cy="255" rx="14" ry="6" fill="#6b4a2b" stroke="${OUT}" stroke-width="2.5"/>`;
-  } else {
-    s += `<rect x="${100 - ww + 4}" y="186" width="${ww - 6}" height="64" rx="7" fill="${o.pants}" stroke="${OUT}" stroke-width="3"/>
-          <rect x="102" y="186" width="${ww - 6}" height="64" rx="7" fill="${shade(o.pants, 0.85)}" stroke="${OUT}" stroke-width="3"/>
-          <ellipse cx="${100 - ww / 2 - 2}" cy="253" rx="16" ry="8" fill="${o.shoes}" stroke="${OUT}" stroke-width="3"/>
-          <ellipse cx="${100 + ww / 2 + 2}" cy="253" rx="16" ry="8" fill="${o.shoes}" stroke="${OUT}" stroke-width="3"/>
-          <ellipse cx="${100 - ww / 2 - 6}" cy="250" rx="6" ry="2.5" fill="#fff" opacity=".35"/>`;
-  }
-  // руки (за туловищем — сначала рукав/кожа)
-  const arm = (x, flip) => {
-    let a = `<rect x="${x}" y="128" width="${aw}" height="66" rx="${aw / 2}" fill="${o.longSleeve ? SH : S}" stroke="${OUT}" stroke-width="3"/>`;
-    if (o.build === "buff") a += `<ellipse cx="${x + aw / 2 + (flip ? -2 : 2)}" cy="158" rx="${aw / 2 + 3}" ry="13" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-                                  <path d="M${x + 5} 162 q${aw / 2 - 5} 6 ${aw - 10} 0" stroke="${SD}" stroke-width="2.5" fill="none"/>`;
-    if (!o.longSleeve) a += `<path d="M${x - 3} 128 h${aw + 6} v${o.build === "buff" ? 18 : 22} h-${aw + 6} Z" fill="${SH}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>`;
-    a += `<circle cx="${x + aw / 2}" cy="196" r="${aw / 2 + 3}" fill="${S}" stroke="${OUT}" stroke-width="3"/>`;
-    return a;
-  };
-  s += arm(lx, false) + arm(rx, true);
-
-  // туловище
-  if (!o.robe) {
-    s += `<path d="M${100 - sw} 136 Q${100 - sw} 122 ${100 - sw + 12} 122 L${100 + sw - 12} 122 Q${100 + sw} 122 ${100 + sw} 136 L${100 + ww} 196 L${100 - ww} 196 Z"
-            fill="${SH}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
-          <path d="M${100 + sw - 14} 124 Q${100 + sw} 124 ${100 + sw} 136 L${100 + ww} 196 L${100 + ww - 16} 196 Z" fill="${SHD}" opacity=".6"/>`;
-    if (o.build === "buff") s += `<path d="M78 146 q11 9 21 0 M101 146 q11 9 21 0" stroke="${SHD}" stroke-width="3" fill="none"/>`;
-    if (o.stripe) s += `<rect x="${100 - sw + 2}" y="150" width="${sw * 2 - 4}" height="8" fill="${o.stripe}" opacity=".9"/>`;
-    if (o.build === "coat") s += `<path d="M100 124 V196" stroke="${OUT}" stroke-width="2.5"/>
-          <circle cx="93" cy="146" r="3" fill="${OUT}"/><circle cx="93" cy="166" r="3" fill="${OUT}"/><circle cx="93" cy="186" r="3" fill="${OUT}"/>
-          <path d="M84 124 L100 146 L116 124" fill="${shade(SH, 1.25)}" stroke="${OUT}" stroke-width="2.5" stroke-linejoin="round"/>`;
-    if (o.logo) s += `<text x="100" y="${o.build === "buff" ? 182 : 178}" text-anchor="middle" font-size="18">${o.logo}</text>`;
-  }
-  // шея и голова
-  s += `<rect x="90" y="110" width="20" height="18" fill="${SD}" stroke="${OUT}" stroke-width="3"/>
-        <circle cx="58" cy="86" r="10" fill="${S}" stroke="${OUT}" stroke-width="3"/><circle cx="142" cy="86" r="10" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-        <circle cx="100" cy="80" r="43" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-        <path d="M128 50 A43 43 0 0 1 128 112 A48 48 0 0 0 128 50Z" fill="${SD}" opacity=".5"/>`;
-  s += o.hair();
-  // лицо
-  const iris = o.iris || "#4a2c16";
-  if (o.sly) {
-    s += `<path d="M76 88 q8 -6 16 0" stroke="${OUT}" stroke-width="3" fill="none"/><path d="M108 88 q8 -6 16 0" stroke="${OUT}" stroke-width="3" fill="none"/>
-          <circle cx="84" cy="91" r="3.5" fill="${OUT}"/><circle cx="116" cy="91" r="3.5" fill="${OUT}"/>
-          <path d="M74 78 l18 5 M126 78 l-18 5" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>`;
-  } else {
-    s += `<ellipse cx="84" cy="88" rx="8.5" ry="10.5" fill="#fff" stroke="${OUT}" stroke-width="2"/><ellipse cx="116" cy="88" rx="8.5" ry="10.5" fill="#fff" stroke="${OUT}" stroke-width="2"/>
-          <circle cx="86" cy="90" r="5.5" fill="${iris}"/><circle cx="118" cy="90" r="5.5" fill="${iris}"/>
-          <circle cx="86" cy="90" r="2.8" fill="#000"/><circle cx="118" cy="90" r="2.8" fill="#000"/>
-          <circle cx="88" cy="87" r="1.8" fill="#fff"/><circle cx="120" cy="87" r="1.8" fill="#fff"/>
-          <path d="${o.brows || "M75 73 q9 -5 18 0 M107 73 q9 -5 18 0"}" stroke="${o.browColor || OUT}" stroke-width="3.5" fill="none" stroke-linecap="round"/>`;
-  }
-  s += `<path d="M98 97 q3 5 -1 7" stroke="${SD}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
-  if (o.mustache) s += `<path d="M80 108 q10 -9 20 -3 q10 -6 20 3 q-10 4 -20 -1 q-10 5 -20 1Z" fill="#5a4030" stroke="${OUT}" stroke-width="2"/>`;
-  else s += o.mouth || `<path d="M88 108 Q100 120 112 108 Z" fill="#8a2a2a" stroke="${OUT}" stroke-width="2.5" stroke-linejoin="round"/><path d="M92 110 h16" stroke="#fff" stroke-width="3"/>`;
-  s += `<ellipse cx="72" cy="102" rx="7" ry="4" fill="#ff7a7a" opacity="${o.blush ?? 0.35}"/><ellipse cx="128" cy="102" rx="7" ry="4" fill="#ff7a7a" opacity="${o.blush ?? 0.35}"/>`;
-  if (o.beard) s += `<path d="M66 100 Q70 130 100 132 Q130 130 134 100 Q124 118 100 120 Q76 118 66 100Z" fill="${o.beard}" stroke="${OUT}" stroke-width="2.5"/>
-                     <path d="M88 110 Q100 118 112 110" stroke="${OUT}" stroke-width="2.5" fill="none"/>`;
-  if (o.extra) s += o.extra;
-  return s;
-}
-
-// ---------- причёски ----------
-const hairCurly = (c) => () => {
-  let s = `<path d="M58 78 Q58 34 100 34 Q142 34 142 78 Q132 56 100 56 Q68 56 58 78Z" fill="${c}"/>`;
-  for (let a = 190; a <= 350; a += 16) {
-    const r = (a * Math.PI) / 180;
-    s += `<circle cx="${100 + Math.cos(r) * 40}" cy="${76 + Math.sin(r) * 40}" r="11" fill="${c}" stroke="${OUT}" stroke-width="2"/>`;
-  }
-  s += `<circle cx="86" cy="42" r="12" fill="${c}"/><circle cx="108" cy="40" r="12" fill="${c}"/><circle cx="96" cy="36" r="4" fill="#fff" opacity=".25"/>`;
-  return s;
-};
-const hairMessy = (c) => () =>
-  `<path d="M56 84 Q52 36 100 34 Q150 34 144 86 L136 70 L130 80 L122 60 L112 72 L104 58 L94 70 L86 58 L78 74 L70 62 L64 80Z" fill="${c}" stroke="${OUT}" stroke-width="3" stroke-linejoin="round"/>
-   <path d="M76 44 Q96 34 118 42" stroke="#fff" stroke-width="3" opacity=".3" fill="none"/>`;
-const hatTolya = () =>
-  `<path d="M58 88 Q56 66 70 60 L74 88Z M142 88 Q144 66 130 60 L126 88Z" fill="#8a8a8a" stroke="${OUT}" stroke-width="2.5"/>
-   <rect x="66" y="6" width="68" height="48" rx="6" fill="#26262c" stroke="${OUT}" stroke-width="3"/>
-   <rect x="66" y="38" width="68" height="10" fill="#7a2a2a"/>
-   <ellipse cx="100" cy="54" rx="58" ry="10" fill="#1d1d22" stroke="${OUT}" stroke-width="3"/>
-   <rect x="72" y="10" width="10" height="26" rx="4" fill="#fff" opacity=".12"/>`;
-const wrap = (c, tail) => () =>
-  `<path d="M56 80 Q54 38 100 36 Q146 38 144 80 Q142 64 100 62 Q58 64 56 80Z" fill="${c}" stroke="${OUT}" stroke-width="3"/>
-   <path d="M58 70 Q100 52 142 70" stroke="${shade(c, 0.75)}" stroke-width="4" fill="none"/>
-   ${tail ? `<path d="M138 62 Q162 70 158 104 Q150 88 136 78Z" fill="${c}" stroke="${OUT}" stroke-width="3"/>` : ""}`;
-
-// ---------- предметы ----------
-const hammer = `<rect x="160" y="96" width="9" height="160" rx="4" fill="#8a5a2b" stroke="${OUT}" stroke-width="3"/>
-  <rect x="140" y="70" width="50" height="36" rx="6" fill="#9aa0ad" stroke="${OUT}" stroke-width="3"/>
-  <rect x="140" y="70" width="50" height="10" rx="4" fill="#c9ced8"/><rect x="140" y="98" width="50" height="8" fill="#6f7482"/>`;
-const candy = (x, y) => `<g transform="translate(${x} ${y})"><polygon points="-22,-9 -10,0 -22,9" fill="#ffd1e6" stroke="${OUT}" stroke-width="2"/>
-  <polygon points="22,-9 10,0 22,9" fill="#ffd1e6" stroke="${OUT}" stroke-width="2"/><ellipse rx="13" ry="10" fill="#ff5fa2" stroke="${OUT}" stroke-width="2.5"/>
-  <path d="M-6 -8 L2 8 M4 -9 L10 4" stroke="#fff" stroke-width="2.5"/></g>`;
-const money = `<g transform="translate(160 186) rotate(-12)"><rect x="-20" y="-11" width="40" height="22" rx="3" fill="#8fd18f" stroke="${OUT}" stroke-width="2.5"/>
-  <circle r="7" fill="#6ab36a"/><text y="4.5" text-anchor="middle" font-size="11" font-weight="700" fill="#1f4f1f">$</text><text x="-14" y="-3" font-size="7" fill="#1f4f1f">100</text></g>`;
-
-// ---------- звери ----------
-function lion() {
-  let mane = "";
-  for (let i = 0; i < 16; i++) {
-    const a = (i / 16) * Math.PI * 2;
-    mane += `<circle cx="${176 + Math.cos(a) * 34}" cy="${84 + Math.sin(a) * 34}" r="18" fill="${i % 2 ? "#a0521d" : "#c26a2a"}" stroke="${OUT}" stroke-width="2"/>`;
-  }
-  return `<ellipse cx="125" cy="186" rx="95" ry="10" fill="#000" opacity=".18"/>
-    <path d="M52 118 Q16 108 20 64" stroke="${OUT}" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M52 118 Q16 108 20 64" stroke="#d9a441" stroke-width="6" fill="none" stroke-linecap="round"/>
-    <ellipse cx="20" cy="58" rx="10" ry="13" fill="#8a4b1c" stroke="${OUT}" stroke-width="2.5"/>
-    <rect x="58" y="126" width="22" height="56" rx="10" fill="#c8923a" stroke="${OUT}" stroke-width="3"/>
-    <rect x="148" y="126" width="22" height="56" rx="10" fill="#c8923a" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="116" cy="118" rx="74" ry="44" fill="#e0a84a" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="116" cy="138" rx="54" ry="18" fill="#f0c878" opacity=".8"/>
-    <rect x="78" y="130" width="22" height="54" rx="10" fill="#e0a84a" stroke="${OUT}" stroke-width="3"/>
-    <rect x="164" y="130" width="22" height="54" rx="10" fill="#e0a84a" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="89" cy="182" rx="15" ry="7" fill="#f0c878" stroke="${OUT}" stroke-width="2.5"/><ellipse cx="175" cy="182" rx="15" ry="7" fill="#f0c878" stroke="${OUT}" stroke-width="2.5"/>
-    ${mane}
-    <circle cx="160" cy="58" r="9" fill="#e8b458" stroke="${OUT}" stroke-width="2.5"/><circle cx="196" cy="58" r="9" fill="#e8b458" stroke="${OUT}" stroke-width="2.5"/>
-    <circle cx="178" cy="88" r="30" fill="#e8b458" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="180" cy="104" rx="17" ry="12" fill="#f7dca0" stroke="${OUT}" stroke-width="2"/>
-    <path d="M172 96 L188 96 L180 104Z" fill="#4a2a1a"/>
-    <path d="M180 104 v5 M180 109 q-6 5 -11 1 M180 109 q6 5 11 1" stroke="${OUT}" stroke-width="2.5" fill="none" stroke-linecap="round"/>
-    <path d="M162 76 l12 4 M196 76 l-12 4" stroke="${OUT}" stroke-width="3.5" stroke-linecap="round"/>
-    <ellipse cx="168" cy="84" rx="5" ry="6" fill="#fff"/><ellipse cx="190" cy="84" rx="5" ry="6" fill="#fff"/>
-    <circle cx="169" cy="85" r="3" fill="#6a3a0a"/><circle cx="191" cy="85" r="3" fill="#6a3a0a"/>`;
-}
-function ant() {
-  const leg = (x, y, dx, dy2) => `<path d="M${x} ${y} L${x + dx} ${y + 26} L${x + dx + dy2} ${y + 62}" stroke="${OUT}" stroke-width="9" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
-    <path d="M${x} ${y} L${x + dx} ${y + 26} L${x + dx + dy2} ${y + 62}" stroke="#6a1d0c" stroke-width="4.5" fill="none" stroke-linejoin="round" stroke-linecap="round"/>`;
-  return `<ellipse cx="125" cy="186" rx="100" ry="10" fill="#000" opacity=".18"/>
-    ${leg(118, 118, -34, -8)}${leg(126, 120, -6, -4)}${leg(134, 118, 22, 10)}
-    <ellipse cx="62" cy="116" rx="48" ry="36" fill="#8b2a14" stroke="${OUT}" stroke-width="3"/>
-    <path d="M40 90 Q34 116 42 144 M62 82 Q56 116 62 152 M84 86 Q80 116 86 146" stroke="#6a1d0c" stroke-width="4" fill="none"/>
-    <ellipse cx="48" cy="98" rx="16" ry="8" fill="#fff" opacity=".25" transform="rotate(-20 48 98)"/>
-    <ellipse cx="110" cy="116" rx="9" ry="8" fill="#7a2410" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="134" cy="112" rx="26" ry="17" fill="#9b3a1c" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="128" cy="104" rx="10" ry="4" fill="#fff" opacity=".25"/>
-    <path d="M176 76 Q180 34 196 30 Q206 30 214 16 M186 78 Q200 46 216 46 Q226 44 232 32" stroke="${OUT}" stroke-width="5" fill="none" stroke-linecap="round"/>
-    <circle cx="180" cy="100" r="28" fill="#8b2a14" stroke="${OUT}" stroke-width="3"/>
-    <path d="M198 118 Q222 118 218 136 Q210 126 196 128Z M190 124 Q206 140 196 150 Q192 136 184 130Z" fill="#4a1508" stroke="${OUT}" stroke-width="2.5"/>
-    <ellipse cx="190" cy="94" rx="9" ry="10" fill="#111"/><circle cx="193" cy="90" r="3" fill="#fff"/>
-    <path d="M176 80 l20 8" stroke="${OUT}" stroke-width="4.5" stroke-linecap="round"/>
-    <ellipse cx="168" cy="88" rx="8" ry="5" fill="#fff" opacity=".22"/>`;
-}
-function fatMan(x0, clean) {
-  const S = clean ? "#f3d6bc" : "#6d4a2b", SD = shade(S, 0.82);
-  const g = (s) => `<g transform="translate(${x0} 0)">${s}</g>`;
-  let s = `<ellipse cx="100" cy="258" rx="82" ry="10" fill="#000" opacity=".2"/>
-    <rect x="66" y="210" width="28" height="42" rx="10" fill="${S}" stroke="${OUT}" stroke-width="3"/><rect x="106" y="210" width="28" height="42" rx="10" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="78" cy="252" rx="18" ry="8" fill="#4a3b2a" stroke="${OUT}" stroke-width="3"/><ellipse cx="122" cy="252" rx="18" ry="8" fill="#4a3b2a" stroke="${OUT}" stroke-width="3"/>
-    <ellipse cx="28" cy="160" rx="14" ry="30" fill="${S}" stroke="${OUT}" stroke-width="3" transform="rotate(18 28 160)"/>
-    <ellipse cx="172" cy="160" rx="14" ry="30" fill="${S}" stroke="${OUT}" stroke-width="3" transform="rotate(-18 172 160)"/>
-    <ellipse cx="100" cy="160" rx="74" ry="66" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-    <path d="M140 108 Q176 150 146 214 Q170 160 140 108Z" fill="${SD}" opacity=".6"/>
-    <path d="M72 150 q12 6 22 0 M106 150 q12 6 22 0" stroke="${SD}" stroke-width="3" fill="none"/>
-    <circle cx="100" cy="182" r="4" fill="${SD}"/>
-    <path d="M38 196 Q100 232 162 196 L156 218 Q100 244 44 218Z" fill="#4a3b2a" stroke="${OUT}" stroke-width="3"/>
-    <circle cx="100" cy="74" r="36" fill="${S}" stroke="${OUT}" stroke-width="3"/>
-    <path d="M70 60 Q76 36 100 38 Q126 36 130 60 Q118 48 100 50 Q82 48 70 60Z" fill="#3a2a1a"/>
-    <ellipse cx="88" cy="76" rx="6" ry="7" fill="#fff" stroke="${OUT}" stroke-width="2"/><ellipse cx="112" cy="76" rx="6" ry="7" fill="#fff" stroke="${OUT}" stroke-width="2"/>
-    <circle cx="89" cy="78" r="3" fill="#000"/><circle cx="113" cy="78" r="3" fill="#000"/>
-    <path d="M80 66 l12 3 M120 66 l-12 3" stroke="${OUT}" stroke-width="3" stroke-linecap="round"/>
-    <path d="M90 94 q10 -6 20 0" stroke="${OUT}" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <ellipse cx="80" cy="88" rx="8" ry="5" fill="${SD}" opacity=".6"/><ellipse cx="120" cy="88" rx="8" ry="5" fill="${SD}" opacity=".6"/>`;
-  if (clean) {
-    s += `<ellipse cx="70" cy="130" rx="7" ry="5" fill="#6d4a2b"/><ellipse cx="128" cy="182" rx="9" ry="5" fill="#6d4a2b"/><ellipse cx="112" cy="62" rx="5" ry="3" fill="#6d4a2b"/>
-      <rect x="186" y="20" width="7" height="236" rx="3" fill="#8a5a2b" stroke="${OUT}" stroke-width="2.5" transform="rotate(8 190 140)"/>
-      <path d="M198 0 L186 30 L204 32Z" fill="#c9ced8" stroke="${OUT}" stroke-width="2.5" transform="rotate(8 190 140)"/>`;
-  } else {
-    s += `<path d="M40 150 q4 18 0 24 q-6 -8 0 -24Z M150 196 q4 14 0 20 q-5 -8 0 -20Z M100 106 q3 10 0 14 q-4 -6 0 -14Z" fill="#4a2f18"/>
-      <circle cx="64" cy="132" r="9" fill="#4a2f18" opacity=".7"/><circle cx="132" cy="160" r="12" fill="#4a2f18" opacity=".6"/><circle cx="92" cy="200" r="7" fill="#4a2f18" opacity=".6"/>
-      <circle cx="116" cy="56" r="5" fill="#4a2f18" opacity=".7"/>`;
-  }
-  return g(s);
-}
-
 // ---------- персонажи ----------
 const W = 200, H = 270;
 const svg = (w, h, inner) => `<svg class="pic" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${inner}</svg>`;
@@ -259,34 +51,29 @@ const heroes = [
   {
     name: "Горилан", role: "Главный герой · Сиренаголовый · Игориван",
     about: "Темнокожий и накачанный, очень сильный боец. На арене победил льва, пустынного муравья и толстяка. Боится только пустынных муравьёв: из-за них он когда-то убежал из родной деревни. Знает свой родной тарабарский язык.",
-    art: svg(W, H, bg("street", W, H) + person({ skin: "#6b4128", shirt: "#e2553f", pants: "#2b3a67", shoes: "#f2f2f2", build: "buff", hair: hairCurly("#161010"), iris: "#2a1608", blush: 0.18, logo: "⚡", extra: hammer,
-      brows: "M74 72 q9 -7 19 -1 M107 71 q10 -6 19 1" })),
+    art: svg(W, H, bg("street", W, H) + person({ ...CHAR.gorilan, extra: hammer })),
   },
   {
     name: "Рома", role: "Рассказчик · лучший друг Горилана",
     about: "Обычный мальчик, не накачанный, зато сообразительный. Первым попробовал конфету, первым нашёл щель под железной дверью и вывел друга из арены.",
-    art: svg(W, H, bg("street", W, H) + person({ skin: "#f6d3b5", shirt: "#4fa3e0", stripe: "#ffffff", pants: "#5b5f6e", shoes: "#e25a5a", build: "thin", hair: hairMessy("#b7773a"), iris: "#4a86c6", browColor: "#8a5424",
-      extra: candy(166, 196) })),
+    art: svg(W, H, bg("street", W, H) + person({ ...CHAR.roma, extra: candy(166, 196) })),
   },
 ];
 const adults = [
   {
     name: "Дядя Толя", role: "Незнакомец с конфетами · похититель",
     about: "Подошёл на улице Алексеевке и угостил ребят конфетой, после которой они потеряли сознание. Потом увёз их на чёрной машине. Всегда в шляпе и сером пальто, хитро щурится.",
-    art: svg(W, H, bg("street", W, H) + person({ skin: "#efc6a2", shirt: "#6b6b73", pants: "#2c2c33", shoes: "#1d1d22", build: "coat", longSleeve: true, hair: hatTolya, sly: true, mustache: true, blush: 0.2,
-      extra: candy(158, 204) })),
+    art: svg(W, H, bg("street", W, H) + person({ ...CHAR.tolya, extra: candy(158, 204) })),
   },
   {
     name: "Дяденька из деревни", role: "Житель пустынной деревни · водитель развалюхи",
     about: "Показал друзьям источник с холодной вкусной водой. Получил от Горилана 100 долларов и очень обрадовался. Потом на старой машине отвёз друзей домой и помог уйти от погони.",
-    art: svg(W, H, bg("desert", W, H) + person({ skin: "#b98556", shirt: "#efe3c4", trim: "#d9534f", build: "normal", robe: true, hair: wrap("#d9534f", true), beard: "#9a9a9a", blush: 0.15, extra: money })),
+    art: svg(W, H, bg("desert", W, H) + person({ ...CHAR.villager, extra: money })),
   },
   {
     name: "Житель деревни", role: "Говорит на тарабарском языке",
     about: "«Эээ… Я русси не пониат. Не поймать». Русского не знает, но Горилан понял его язык: оказалось, это его родной.",
-    art: svg(W, H, bg("desert", W, H) + person({ skin: "#a8744a", shirt: "#c9d6a3", trim: "#3c7dc4", build: "thin", robe: true, hair: wrap("#3c7dc4", false), blush: 0.15,
-      brows: "M74 70 q9 -8 19 -2 M107 68 q10 -4 19 4",
-      mouth: `<ellipse cx="100" cy="111" rx="7" ry="6" fill="#8a2a2a" stroke="${OUT}" stroke-width="2.5"/>` })),
+    art: svg(W, H, bg("desert", W, H) + person(CHAR.villager2)),
   },
 ];
 const foes = [
