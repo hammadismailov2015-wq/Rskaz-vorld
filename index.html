@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мир рассказов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Rubik:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1026;
+    --bg2: #161a3a;
+    --ink: #eef0ff;
+    --muted: #9aa0c8;
+    --accent: #ffcf6b;
+    --sea: #1b2556;
+    --card: #1c2148;
+    --line: #2d3470;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(ellipse at top, var(--bg2), var(--bg) 70%);
+    color: var(--ink);
+    font-family: "Rubik", system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header { text-align: center; padding: 40px 16px 8px; }
+  h1 { font-family: "Lora", serif; font-size: clamp(32px, 6vw, 56px); margin: 0; color: var(--accent); letter-spacing: 1px; }
+  header p { color: var(--muted); margin: 8px 0 0; }
+  nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 20px 16px; }
+  nav button {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 999px; padding: 8px 18px; font: inherit; cursor: pointer;
+  }
+  nav button.active { background: var(--accent); color: #1a1a2e; border-color: var(--accent); }
+  main { max-width: 1100px; margin: 0 auto; padding: 0 16px 60px; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Карта */
+  #map { width: 100%; height: auto; display: block; border-radius: 20px; background: var(--sea); border: 1px solid var(--line); }
+  .island { cursor: pointer; transition: transform .2s; transform-box: fill-box; transform-origin: center; }
+  .island:hover { transform: scale(1.08); }
+  .island text { font-family: "Lora", serif; font-size: 15px; fill: var(--ink); pointer-events: none; }
+  .fog text { fill: var(--muted); font-style: italic; }
+  .hint { text-align: center; color: var(--muted); margin-top: 12px; font-size: 14px; }
+
+  /* Карточки */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+  .card h3 { font-family: "Lora", serif; margin: 0 0 6px; color: var(--accent); }
+  .card .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .card p { margin: 0; line-height: 1.5; }
+  .card.clickable { cursor: pointer; }
+  .card.clickable:hover { border-color: var(--accent); }
+  .tag { display: inline-block; background: var(--line); border-radius: 999px; padding: 2px 10px; font-size: 12px; margin: 6px 4px 0 0; }
+
+  /* Хронология */
+  .timeline { border-left: 2px solid var(--line); margin-left: 8px; padding-left: 20px; }
+  .tl-item { position: relative; margin-bottom: 22px; }
+  .tl-item::before { content: ""; position: absolute; left: -28px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--accent); }
+  .tl-item b { color: var(--accent); }
+
+  .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-style: italic; }
+
+  /* Окно рассказа */
+  dialog { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 20px; max-width: 720px; width: calc(100% - 32px); padding: 0; }
+  dialog::backdrop { background: rgba(5, 6, 20, .75); }
+  .dlg { padding: 24px; max-height: 85vh; overflow-y: auto; }
+  .dlg h2 { font-family: "Lora", serif; color: var(--accent); margin: 0 0 4px; }
+  .dlg .text { font-family: "Lora", serif; line-height: 1.75; white-space: pre-wrap; margin-top: 16px; }
+  .dlg h4 { margin: 20px 0 6px; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; }
+  .close { float: right; background: none; border: none; color: var(--muted); font-size: 28px; cursor: pointer; line-height: 1; }
+</style>
+</head>
+<body>
+
+<script>
+/* =====================================================================
+   ЗДЕСЬ ЖИВУТ ТВОИ РАССКАЗЫ.
+   Каждый рассказ — это остров на карте мира.
+   Чтобы добавить рассказ, скопируй блок { ... } и заполни поля.
+   ===================================================================== */
+const WORLD = {
+  name: "Мир рассказов",
+  tagline: "Каждый рассказ — отдельный остров. Нажми на остров, чтобы прочитать.",
+};
+
+const STORIES = [
+  // Пример того, как выглядит рассказ (удалить, когда появятся настоящие):
+  // {
+  //   id: "pervyj",
+  //   title: "Название рассказа",
+  //   place: "Где происходит действие",       // имя острова на карте
+  //   era: "Когда происходит",                // для хронологии
+  //   order: 1,                               // порядок на хронологии
+  //   color: "#4fb286",                       // цвет острова
+  //   summary: "Коротко, о чём рассказ.",
+  //   characters: [{ name: "Имя", about: "Кто это такой" }],
+  //   tags: ["приключения"],
+  //   text: `Полный текст рассказа...`,
+  // },
+];
+</script>
+
+<header>
+  <h1 id="world-name"></h1>
+  <p id="world-tagline"></p>
+</header>
+
+<nav>
+  <button data-view="map-view" class="active">🗺️ Карта</button>
+  <button data-view="stories-view">📖 Рассказы</button>
+  <button data-view="chars-view">🧙 Персонажи</button>
+  <button data-view="time-view">⏳ Хронология</button>
+</nav>
+
+<main>
+  <section id="map-view" class="view active">
+    <svg id="map" viewBox="0 0 1000 600" role="img" aria-label="Карта мира рассказов"></svg>
+    <p class="hint" id="map-hint"></p>
+  </section>
+  <section id="stories-view" class="view"><div class="grid" id="stories"></div></section>
+  <section id="chars-view" class="view"><div class="grid" id="chars"></div></section>
+  <section id="time-view" class="view"><div class="timeline" id="timeline"></div></section>
+</main>
+
+<dialog id="dlg"><div class="dlg" id="dlg-body"></div></dialog>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const EMPTY = "Мир пока пуст. Пришли свой первый рассказ — и здесь появится остров!";
+
+$("#world-name").textContent = WORLD.name;
+$("#world-tagline").textContent = WORLD.tagline;
+
+// Переключение вкладок
+document.querySelectorAll("nav button").forEach((b) =>
+  b.addEventListener("click", () => {
+    document.querySelectorAll("nav button, .view").forEach((el) => el.classList.remove("active"));
+    b.classList.add("active");
+    $("#" + b.dataset.view).classList.add("active");
+  })
+);
+
+// Псевдослучайное число из строки — чтобы форма острова не менялась
+function seeded(str) {
+  let h = 2166136261;
+  for (const c of str) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return () => ((h = Math.imul(h ^ (h >>> 15), 2246822507) >>> 0) / 4294967296);
+}
+
+function islandPath(cx, cy, r, rnd) {
+  const pts = [];
+  const n = 14;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    const rr = r * (0.75 + rnd() * 0.45);
+    pts.push([cx + Math.cos(a) * rr * 1.3, cy + Math.sin(a) * rr * 0.85]);
+  }
+  let d = `M${pts[0][0]},${pts[0][1]}`;
+  for (let i = 0; i < n; i++) {
+    const p = pts[(i + 1) % n], q = pts[(i + 2) % n];
+    d += ` Q${p[0]},${p[1]} ${(p[0] + q[0]) / 2},${(p[1] + q[1]) / 2}`;
+  }
+  return d + "Z";
+}
+
+// Места для островов на карте
+const SPOTS = [[500, 300], [240, 170], [760, 170], [240, 440], [760, 440], [500, 110], [500, 500], [110, 300], [890, 300], [360, 300], [640, 300], [120, 80], [880, 80], [120, 530], [880, 530]];
+const PALETTE = ["#4fb286", "#d9825b", "#7b8cde", "#c36f9f", "#c9b458", "#5aa9c9"];
+
+function drawMap() {
+  const svg = $("#map");
+  let out = "";
+  // звёзды-волны
+  const rnd = seeded("sea");
+  for (let i = 0; i < 70; i++) out += `<circle cx="${rnd() * 1000}" cy="${rnd() * 600}" r="${rnd() * 1.6}" fill="#ffffff" opacity="${0.15 + rnd() * 0.3}"/>`;
+
+  STORIES.forEach((s, i) => {
+    const [x, y] = SPOTS[i % SPOTS.length];
+    const color = s.color || PALETTE[i % PALETTE.length];
+    const r = seeded(s.id || s.title);
+    out += `<g class="island" data-i="${i}" tabindex="0">
+      <path d="${islandPath(x, y, 55, r)}" fill="${color}" stroke="#fff3" stroke-width="3"/>
+      <path d="${islandPath(x, y - 4, 28, r)}" fill="#ffffff22"/>
+      <text x="${x}" y="${y + 80}" text-anchor="middle">${esc(s.place || s.title)}</text>
+    </g>`;
+  });
+
+  // Несколько «неоткрытых» островов в тумане
+  const fogCount = Math.max(2, 4 - STORIES.length);
+  for (let k = 0; k < fogCount; k++) {
+    const idx = STORIES.length + k;
+    if (idx >= SPOTS.length) break;
+    const [x, y] = SPOTS[idx];
+    out += `<g class="fog"><path d="${islandPath(x, y, 45, seeded("fog" + k))}" fill="#ffffff10" stroke="#ffffff30" stroke-dasharray="6 6"/>
+      <text x="${x}" y="${y + 70}" text-anchor="middle">? ждёт рассказа</text></g>`;
+  }
+  svg.innerHTML = out;
+  svg.querySelectorAll(".island").forEach((g) => {
+    const open = () => openStory(+g.dataset.i);
+    g.addEventListener("click", open);
+    g.addEventListener("keydown", (e) => e.key === "Enter" && open());
+  });
+  $("#map-hint").textContent = STORIES.length ? "Нажми на остров, чтобы открыть рассказ." : EMPTY;
+}
+
+function drawStories() {
+  $("#stories").innerHTML = STORIES.length
+    ? STORIES.map((s, i) => `<div class="card clickable" data-i="${i}">
+        <h3>${esc(s.title)}</h3>
+        <div class="meta">📍 ${esc(s.place || "—")} · ${esc(s.era || "")}</div>
+        <p>${esc(s.summary)}</p>
+        ${(s.tags || []).map((t) => `<span class="tag">${esc(t)}</span>`).join("")}
+      </div>`).join("")
+    : `<div class="empty">${EMPTY}</div>`;
+  document.querySelectorAll("#stories .card").forEach((c) => c.addEventListener("click", () => openStory(+c.dataset.i)));
+}
+
+function drawCharacters() {
+  const map = new Map();
+  STORIES.forEach((s) => (s.characters || []).forEach((c) => {
+    if (!map.has(c.name)) map.set(c.name, { ...c, stories: [] });
+    map.get(c.name).stories.push(s.title);
+  }));
+  const list = [...map.values()];
+  $("#chars").innerHTML = list.length
+    ? list.map((c) => `<div class="card">
+        <h3>${esc(c.name)}</h3>
+        <p>${esc(c.about)}</p>
+        ${c.stories.map((t) => `<span class="tag">📖 ${esc(t)}</span>`).join("")}
+      </div>`).join("")
+    : `<div class="empty">Персонажи появятся вместе с рассказами.</div>`;
+}
+
+function drawTimeline() {
+  const sorted = [...STORIES].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  $("#timeline").innerHTML = sorted.length
+    ? sorted.map((s) => `<div class="tl-item"><b>${esc(s.era || "Время неизвестно")}</b><br>${esc(s.title)} — <span style="color:var(--muted)">${esc(s.summary)}</span></div>`).join("")
+    : `<div class="empty">Хронология начнётся с первого рассказа.</div>`;
+}
+
+function openStory(i) {
+  const s = STORIES[i];
+  $("#dlg-body").innerHTML = `
+    <button class="close" aria-label="Закрыть" onclick="document.getElementById('dlg').close()">×</button>
+    <h2>${esc(s.title)}</h2>
+    <div class="meta" style="color:var(--muted)">📍 ${esc(s.place || "—")} · ⏳ ${esc(s.era || "—")}</div>
+    <h4>О чём</h4><p>${esc(s.summary)}</p>
+    ${(s.characters || []).length ? `<h4>Персонажи</h4>` + s.characters.map((c) => `<p><b>${esc(c.name)}</b> — ${esc(c.about)}</p>`).join("") : ""}
+    ${s.text ? `<h4>Текст</h4><div class="text">${esc(s.text)}</div>` : ""}`;
+  $("#dlg").showModal();
+}
+
+drawMap();
+drawStories();
+drawCharacters();
+drawTimeline();
+</script>
+</body>
+</html>
