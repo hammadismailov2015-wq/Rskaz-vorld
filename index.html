@@ -28,6 +28,7 @@
   header { text-align: center; padding: 40px 16px 8px; }
   h1 { font-family: "Lora", serif; font-size: clamp(32px, 6vw, 56px); margin: 0; color: var(--accent); letter-spacing: 1px; }
   header p { color: var(--muted); margin: 8px 0 0; }
+  .play { display: inline-block; margin-top: 16px; background: var(--accent); color: #1a1a2e; text-decoration: none; font-weight: 600; padding: 10px 22px; border-radius: 999px; }
   nav { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; padding: 20px 16px; }
   nav button {
     background: var(--card); color: var(--ink); border: 1px solid var(--line);
@@ -141,6 +142,7 @@ const STORIES = [
 <header>
   <h1 id="world-name"></h1>
   <p id="world-tagline"></p>
+  <a class="play" href="game.html">🎮 Играть: пройди Книгу 1 сам</a>
 </header>
 
 <nav>

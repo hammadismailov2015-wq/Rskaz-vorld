@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Мир Горилана и Ромы</title>
+<style>
+  :root { --bg: #0d1026; --ink: #eef0ff; --accent: #ffcf6b; --panel: rgba(20, 24, 56, .92); --line: #2d3470; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas#game { display: block; width: 100vw; height: 100vh; }
+  #hud { position: fixed; top: 10px; left: 10px; right: 160px; pointer-events: none; }
+  #quest { display: inline-block; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: 14px; line-height: 1.35; }
+  #quest b { color: var(--accent); }
+  #water { margin-top: 8px; display: none; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 10px; width: 180px; font-size: 13px; }
+  #water .bar { height: 8px; background: #2d3470; border-radius: 4px; margin-top: 4px; overflow: hidden; }
+  #water .fill { height: 100%; background: #58b8e8; width: 100%; }
+  #mini { position: fixed; top: 10px; right: 10px; width: 140px; height: 100px; border: 2px solid var(--line); border-radius: 8px; image-rendering: pixelated; background: #000; }
+  #back { position: fixed; right: 10px; top: 118px; font-size: 12px; color: #9aa0c8; text-decoration: none; background: var(--panel); padding: 4px 8px; border-radius: 8px; }
+  #dialog { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); width: min(680px, calc(100% - 32px)); box-sizing: border-box;
+    background: var(--panel); border: 2px solid var(--accent); border-radius: 16px; padding: 12px 16px; display: none; font-size: 17px; line-height: 1.45; cursor: pointer; }
+  #dialog .who { color: var(--accent); font-weight: 700; margin-bottom: 2px; }
+  #dialog .who.narr { color: #9aa0c8; }
+  #dialog .txt.narr { font-style: italic; }
+  #dialog .next { text-align: right; font-size: 12px; opacity: .6; margin-top: 4px; }
+  #big { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none;
+    font-size: clamp(56px, 16vw, 150px); font-weight: 900; color: #fff; opacity: 0; transition: opacity .25s; text-shadow: 0 0 24px #000, 0 0 60px #f60; }
+  #fade { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 10, 28, .82); padding: 16px; }
+  .overlay .box { background: #1c2148; border: 1px solid var(--line); border-radius: 20px; padding: 24px; max-width: 460px; text-align: center; }
+  .overlay h1 { color: var(--accent); margin: 0 0 6px; font-family: Georgia, serif; }
+  .overlay p { color: #c8cbef; line-height: 1.5; }
+  .overlay button { background: var(--accent); color: #1a1a2e; border: none; border-radius: 999px; padding: 12px 22px; font-size: 17px; font-weight: 700; cursor: pointer; margin: 6px; }
+  .overlay button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  #end { display: none; }
+  @media (max-width: 600px) { #mini { width: 105px; height: 75px; } #back { top: 92px; } #hud { right: 125px; } #quest { font-size: 13px; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<canvas id="mini" width="140" height="100"></canvas>
+<a id="back" href="index.html">← к миру рассказов</a>
+<div id="hud">
+  <div id="quest"></div>
+  <div id="water">💧 Вода<div class="bar"><div class="fill"></div></div></div>
+</div>
+<div id="dialog"><div class="who"></div><div class="txt"></div><div class="next">нажми, чтобы продолжить ▶</div></div>
+<div id="big"></div>
+<div id="fade"></div>
+
+<div class="overlay" id="start"><div class="box">
+  <h1>Мир Горилана и Ромы</h1>
+  <p><b>Книга 1. Конфета дяди Толи</b></p>
+  <p>Ты путник в огромном мире. Иди в город Алексеевку и узнай, что случилось с Гориланом и Ромой.</p>
+  <p style="font-size:14px">⌨️ Стрелки или WASD — идти, пробел — дальше<br>📱 Проведи пальцем по экрану — идти, нажми — дальше</p>
+  <button id="play">▶ Начать</button>
+</div></div>
+
+<div class="overlay" id="end"><div class="box">
+  <h1>КОНЕЦ</h1>
+  <p>Будут ли следующие приключения Игоривана и Ромы — неизвестно...</p>
+  <button id="roam">Гулять дальше</button>
+  <button class="ghost" onclick="location.reload()">Сначала</button>
+</div></div>
+
+<script>
+// ============ Мир ============
+const T = 32, W = 140, H = 100;
+const WATER = 0, GRASS = 1, ROAD = 2, SAND = 3, STONE = 4, ARENA = 5, WALL = 6, PAVE = 7, SPRING = 8;
+const AC = { x: 100, y: 22 }; // центр арены (в клетках)
+const map = new Uint8Array(W * H).fill(GRASS);
+const solidObj = new Uint8Array(W * H);
+const at = (x, y) => y * W + x;
+const get = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? WATER : map[at(x, y)]);
+const set = (x, y, t) => { if (x >= 0 && y >= 0 && x < W && y < H) map[at(x, y)] = t; };
+function rect(x0, y0, x1, y1, t) { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) set(x, y, t); }
+
+let seed = 12345;
+const rnd = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+const hash = (x, y) => ((x * 73856093) ^ (y * 19349663)) >>> 0;
+
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const edge = Math.min(x, y, W - 1 - x, H - 1 - y);
+  if (edge < 2.5 + Math.sin(x * 0.31) + Math.sin(y * 0.37)) { set(x, y, WATER); continue; }
+  if (((x - 22) / 10) ** 2 + ((y - 62) / 7) ** 2 < 1) { set(x, y, WATER); continue; } // озеро
+  const desert = (x > 62 + 2 * Math.sin(y * 0.3) && y > 46 + 2 * Math.sin(x * 0.25)) ||
+                 (x > 84 + 2 * Math.sin(y * 0.3) && y > 32 + 1.5 * Math.sin(x * 0.4));
+  if (desert) set(x, y, SAND);
+}
+// город Алексеевка
+rect(30, 13, 62, 31, PAVE);
+// арена
+for (let y = AC.y - 13; y <= AC.y + 13; y++) for (let x = AC.x - 13; x <= AC.x + 13; x++) {
+  const d = Math.hypot(x + 0.5 - AC.x, y + 0.5 - AC.y);
+  const gate = (Math.abs(y + 0.5 - AC.y) < 1.6 && x < AC.x) || (Math.abs(x + 0.5 - AC.x) < 1.6 && y > AC.y);
+  if (d < 8) set(x, y, ARENA);
+  else if (d < 11) set(x, y, STONE);
+  else if (d < 12.3) set(x, y, gate ? STONE : WALL);
+}
+// дороги
+rect(5, 21, 88, 23, ROAD);          // улица до арены
+rect(99, 35, 101, 86, ROAD);        // от железной двери на юг
+rect(45, 87, 104, 89, ROAD);        // из деревни на запад
+rect(45, 24, 47, 88, ROAD);         // обратно в Алексеевку
+rect(108, 88, 109, 89, SPRING);     // источник
+
+// ============ Предметы ============
+const objs = [];
+function solidRect(x, y, w, h) { for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) solidObj[at(i, j)] = 1; }
+const HOUSE_COLORS = ["#e8d6b0", "#c9e0f0", "#f0c9c0", "#d8e8c0", "#e9e1f5", "#f5e0a8"];
+[[33, 14], [39, 14], [51, 14], [57, 14], [33, 26], [39, 26], [51, 26], [57, 26]].forEach(([x, y], i) => {
+  objs.push({ type: "house", x: (x + 2.5) * T, y: (y + 4) * T, w: 5, h: 4, color: HOUSE_COLORS[i % 6], roof: i % 2 ? "#a04a3a" : "#4a5a8a" });
+  solidRect(x, y, 5, 4);
+});
+[[103, 79], [109, 80], [113, 84], [112, 91], [104, 92]].forEach(([x, y]) => {
+  objs.push({ type: "hut", x: (x + 1.5) * T, y: (y + 3) * T });
+  solidRect(x, y, 3, 3);
+});
+objs.push({ type: "bench", x: 44.4 * T, y: 20.75 * T });
+objs.push({ type: "sign", x: 28 * T, y: 20.8 * T, text: "Алексеевка" });
+objs.push({ type: "sign", x: 80 * T, y: 20.8 * T, text: "Арена →" });
+objs.push({ type: "sign", x: 98 * T, y: 38 * T, text: "↓ Пустыня" });
+objs.push({ type: "sign", x: 48.5 * T, y: 86.8 * T, text: "Деревня →" });
+objs.push({ type: "rack", x: (AC.x - 6.3) * T, y: (AC.y + 5.8) * T });
+objs.push({ type: "door", x: AC.x * T, y: (AC.y + 11.4) * T });
+
+const nearAny = (x, y, types, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) if (types.includes(get(x + i, y + j))) return true; return false; };
+for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+  const t = get(x, y);
+  if (t === GRASS && !nearAny(x, y, [ROAD, PAVE, STONE, WALL], 2) && rnd() < 0.1) {
+    objs.push({ type: "tree", x: (x + 0.5) * T, y: (y + 0.9) * T, v: rnd() }); solidObj[at(x, y)] = 1;
+  } else if (t === SAND && !nearAny(x, y, [ROAD, STONE, WALL, SPRING], 2) && Math.hypot(x - 107, y - 86) > 11 && rnd() < 0.015) {
+    objs.push({ type: "cactus", x: (x + 0.5) * T, y: (y + 0.9) * T }); solidObj[at(x, y)] = 1;
+  }
+}
+const isSolid = (tx, ty) => { const t = get(tx, ty); return t === WATER || t === WALL || t === SPRING || solidObj[at(tx, ty)] === 1; };
+
+// ============ Персонажи ============
+const STY = {
+  player:    { skin: "#f0c8a0", shirt: "#2e9e6b", pants: "#3a3a48", hair: "#6b4226", bw: 13, aw: 4, pack: true },
+  gorilan:   { skin: "#5a3620", shirt: "#e2553f", pants: "#2b3a67", hair: "#141010", bw: 17, aw: 5.5, curly: true, size: 1.05 },
+  roma:      { skin: "#f6d3b5", shirt: "#4fa3e0", pants: "#5b5f6e", hair: "#b7773a", bw: 12, aw: 3.5 },
+  tolya:     { skin: "#efc6a2", shirt: "#6b6b73", pants: "#2c2c33", hair: "#555", bw: 14, aw: 4, hat: "#26262c", mustache: true, size: 1.25 },
+  villager:  { skin: "#b98556", shirt: "#efe3c4", hair: "#222", bw: 14, aw: 4, robe: true, wrap: "#d9534f", size: 1.1 },
+  villager2: { skin: "#a8744a", shirt: "#c9d6a3", hair: "#222", bw: 13, aw: 4, robe: true, wrap: "#3c7dc4" },
+  fat:       { skin: "#6d4a2b", cleanSkin: "#f3d6bc", pants: "#4a3b2a", hair: "#3a2a1a", bw: 32, aw: 6, fat: true, size: 1.2 },
+};
+const NAMES = { gorilan: "Горилан", roma: "Рома", tolya: "Дядя Толя", villager: "Дяденька из деревни", villager2: "Житель деревни", both: "Горилан и Рома", narr: "📖 Рассказ" };
+
+const actors = [];
+function mk(kind, tx, ty, o = {}) { const a = Object.assign({ kind, x: tx * T, y: ty * T, dir: 1, phase: 0, alpha: 1, shake: 0 }, o); actors.push(a); return a; }
+const player = mk("player", 7, 22.6);
+const G = mk("gorilan", 43.6, 20.9, { sit: true });
+const R = mk("roma", 45.2, 20.9, { sit: true, dir: -1 });
+const V = mk("villager", 106, 86, { dir: -1 });
+const V2 = mk("villager2", 108.2, 85.2, { dir: -1 });
+const OC = mk("oldcar", 103, 88.2, { angle: Math.PI });
+
+const SKINS = ["#f1c9a5", "#d9a47a", "#8d5a3b", "#5a3620", "#f6d3b5"];
+const SHIRTS = ["#e25a5a", "#5a8ee2", "#e2c25a", "#7ad17a", "#c07ae2", "#eeeeee", "#e2905a"];
+const spectators = [];
+for (let i = 0; i < 70; i++) {
+  const a = rnd() * Math.PI * 2;
+  const d = Math.min(Math.abs(a - Math.PI), Math.abs(a - Math.PI / 2));
+  if (d < 0.25) continue; // не загораживать ворота
+  const r = 9.2 + rnd() * 1.4;
+  spectators.push({ kind: "spect", x: (AC.x + Math.cos(a) * r) * T, y: (AC.y + Math.sin(a) * r) * T, dir: Math.cos(a) > 0 ? -1 : 1, phase: rnd() * 6, alpha: 1, shake: 0,
+    sty: { skin: SKINS[i % 5], shirt: SHIRTS[i % 7], pants: "#333", hair: i % 3 ? "#222" : "#a5642e", bw: 12, aw: 3.5, size: 0.8 } });
+}
+
+// ============ Экран ============
+const cv = document.getElementById("game"), ctx = cv.getContext("2d");
+let VW, VH, Z;
+function resize() {
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  VW = innerWidth; VH = innerHeight; cv.width = VW * dpr; cv.height = VH * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  Z = Math.min(1.25, Math.max(0.75, Math.min(VW, VH) / 560));
+}
+addEventListener("resize", resize); resize();
+
+const cam = { x: player.x, y: player.y };
+let focus = null, camShake = 0, time = 0;
+let running = false, busy = false, stage = 0;
+let thirstOn = false, water = 100, clapT = 0, hole = null;
+const particles = [];
+let obj = null, speakers = [];
+
+// ============ Управление ============
+const keys = {};
+addEventListener("keydown", (e) => {
+  keys[e.key.toLowerCase()] = true;
+  if ([" ", "enter", "e"].includes(e.key.toLowerCase())) { advance(); e.preventDefault(); }
+  if (e.key.startsWith("Arrow")) e.preventDefault();
+});
+addEventListener("keyup", (e) => { keys[e.key.toLowerCase()] = false; });
+const stick = { on: false, ox: 0, oy: 0, x: 0, y: 0, id: null };
+cv.addEventListener("pointerdown", (e) => {
+  if (dlg.open) { advance(); return; }
+  stick.on = true; stick.id = e.pointerId; stick.ox = stick.x = e.clientX; stick.oy = stick.y = e.clientY;
+});
+addEventListener("pointermove", (e) => { if (stick.on && e.pointerId === stick.id) { stick.x = e.clientX; stick.y = e.clientY; } });
+addEventListener("pointerup", (e) => { if (e.pointerId === stick.id) stick.on = false; });
+addEventListener("pointercancel", () => { stick.on = false; });
+
+// ============ Диалоги и эффекты ============
+const $ = (s) => document.querySelector(s);
+const dlg = { open: false, full: "", shown: 0, resolve: null };
+function say(who, text) {
+  return new Promise((res) => {
+    speakers = who === "both" ? [G, R] : who === "narr" ? [] : actors.filter((a) => a.kind === who);
+    $("#dialog .who").textContent = NAMES[who] || who;
+    $("#dialog .who").className = "who" + (who === "narr" ? " narr" : "");
+    $("#dialog .txt").className = "txt" + (who === "narr" ? " narr" : "");
+    $("#dialog .txt").textContent = "";
+    $("#dialog").style.display = "block";
+    Object.assign(dlg, { open: true, full: text, shown: 0, resolve: res });
+  });
+}
+function advance() {
+  if (!dlg.open) return;
+  if (dlg.shown < dlg.full.length) { dlg.shown = dlg.full.length; $("#dialog .txt").textContent = dlg.full; return; }
+  dlg.open = false; speakers = [];
+  $("#dialog").style.display = "none";
+  const r = dlg.resolve; dlg.resolve = null; r && r();
+}
+$("#dialog").addEventListener("pointerdown", (e) => { e.stopPropagation(); advance(); });
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+function moveTo(a, tx, ty, speed = 110) { return new Promise((r) => { a.target = { x: tx * T, y: ty * T }; a.speed = speed; a.resolve = r; }); }
+function big(text) { const b = $("#big"); b.textContent = text; b.style.opacity = 1; setTimeout(() => (b.style.opacity = 0), 800); }
+async function fade(v, ms) { const f = $("#fade"); f.style.transition = `opacity ${ms}ms`; f.style.opacity = v; await wait(ms); }
+function emoji(ch, x, y, n = 1, spread = 20) {
+  for (let i = 0; i < n; i++) particles.push({ ch, x: x + (Math.random() - 0.5) * spread, y: y + (Math.random() - 0.5) * spread, vx: (Math.random() - 0.5) * 40, vy: -40 - Math.random() * 40, life: 1.4 });
+}
+function objective(text, tx, ty) { $("#quest").innerHTML = "🎯 " + text; obj = tx == null ? null : { x: tx * T, y: ty * T }; }
+async function hit(a, b) {
+  const side = b.x > a.x ? -1 : 1;
+  await moveTo(a, (b.x + side * 30) / T, b.y / T, 420);
+  emoji("💥", b.x, b.y - 30, 3); b.shake = 0.5; camShake = 10;
+  await wait(350);
+}
+async function vanish(a) { a.fading = true; await wait(700); a.hidden = true; }
+function place(a, tx, ty) { a.x = tx * T; a.y = ty * T; a.hidden = false; }
+function stop(a) { if (a.target) { a.x = a.target.x; a.y = a.target.y; a.target = null; a.moving = false; const r = a.resolve; a.resolve = null; r && r(); } }
+
+// ============ Сцены по книге ============
+async function run(scene) { busy = true; stick.on = false; try { await scene(); } finally { busy = false; focus = null; } }
+
+async function scene1() {
+  focus = { x: 44.5 * T, y: 21.5 * T };
+  const tol = mk("tolya", 62, 22.4);
+  await moveTo(tol, 46.9, 21.8, 90); tol.dir = -1; G.dir = 1; R.dir = 1;
+  await say("tolya", "Привет!");
+  await say("both", "Привет!");
+  await say("gorilan", "Мне, когда было 5 лет, мама говорила не разговаривать с незнакомыми дядями...");
+  await say("tolya", "Меня зовут дядя Толя. А тебя?");
+  await say("gorilan", "Меня зовут Гор... А нет! Зови меня Сиренаголовый.");
+  await say("roma", "Меня зовут Рома.");
+  await say("tolya", "Вот и познакомились. Молодцы! Нате конфетку.");
+  G.item = R.item = "candy"; emoji("🍬", G.x, G.y - 40); emoji("🍬", R.x, R.y - 40);
+  await say("both", "Спасибо!");
+  await say("gorilan", "Хм... Почему этот дядя дал нам конфетку просто так? Может, она отравлена?");
+  R.item = null; emoji("😋", R.x, R.y - 50);
+  await say("roma", "Не знаю, но очень вкусная!");
+  await say("gorilan", "Ты что! Вдруг она отравлена?!");
+  await say("roma", "Ничего не знаю. Со мной ничего не случилось — значит, не отравлена.");
+  await say("gorilan", "Ну ладно, тогда и я съем свою. Ням-ням-ням!");
+  G.item = null; emoji("😋", G.x, G.y - 50);
+  await say("roma", "Как вкусно! Интересно, сколько стоят такие вкусные конфеты? Я в магазине таких не видел...");
+  big("БУХ!"); R.sit = false; R.lying = true; camShake = 8; await wait(1100);
+  G.sit = false; G.lying = true; camShake = 8; await wait(900);
+  await say("narr", "Рома потерял сознание. А через несколько секунд упал и Горилан...");
+  await say("tolya", "Хе-хе-хе...");
+  const car = mk("blackcar", 72, 22.6, { angle: Math.PI });
+  await moveTo(car, 49.5, 22.6, 300);
+  await fade(1, 500); G.hidden = R.hidden = tol.hidden = true; await wait(400); await fade(0, 500);
+  await say("narr", "Их затащили в чёрную машину и куда-то увезли!");
+  await moveTo(car, 86, 22.6, 320); car.hidden = true;
+  stage = 1;
+  objective("Чёрная машина уехала на <b>восток</b>. Иди за ней к арене!", 88, 22.5);
+}
+
+async function scene2() {
+  focus = { x: AC.x * T, y: (AC.y + 1) * T };
+  place(G, AC.x - 2, AC.y); G.lying = false; G.dir = 1;
+  place(R, AC.x - 9, AC.y - 2.6); R.lying = false; R.dir = 1;
+  await say("narr", "Рома очнулся в какой-то тусклой комнате. Горилана куда-то тащили, а он кричал: «Помогите!»");
+  await say("roma", "Рядом была лестница. Я поднялся по ней и увидел...");
+  const lion = mk("lion", AC.x + 6, AC.y, { dir: -1 });
+  await say("roma", "Горилан сражается со львом!");
+  await moveTo(lion, AC.x + 1.2, AC.y, 160);
+  await hit(G, lion);
+  await moveTo(lion, AC.x + 3, AC.y, 300); await vanish(lion);
+  clapT = 2; await say("roma", "Горилан победил!");
+
+  const ant = mk("ant", AC.x + 6, AC.y, { dir: -1 });
+  await say("roma", "И на сцену вышел пустынный муравей!");
+  G.scared = true; await moveTo(G, AC.x - 4, AC.y + 5, 230);
+  await say("narr", "Горилан так испугался, что забился в угол.");
+  await moveTo(ant, AC.x - 1.5, AC.y + 4, 55);
+  await say("narr", "Муравей приближался... Но тут Горилан увидел рядом лезвия, ножи, кинжалы, копья, мечи, молоты...");
+  G.scared = false; await moveTo(G, AC.x - 5.4, AC.y + 5.9, 150); G.weapon = "hammer"; G.dir = 1;
+  await say("narr", "Горилан взял гигантский молот и со всей силы...");
+  await hit(G, ant); big("БАМ!"); await vanish(ant);
+
+  const fat = mk("fat", AC.x + 6, AC.y + 1, { dir: -1 });
+  await moveTo(G, AC.x - 1.5, AC.y + 1, 150); G.dir = 1;
+  await say("roma", "На сцену вышел другой человек. Он был весь коричневый...");
+  await moveTo(fat, AC.x + 2.2, AC.y + 1, 70);
+  await hit(G, fat); fat.clean = true; emoji("🟤", fat.x, fat.y - 30, 8, 40);
+  await say("roma", "Горилан ударил его молотом — и он оказался белым! Просто он был в грязи.");
+  await say("roma", "А ещё он был такой жирный, что удар пронёсся по его жиру, и с ним ничего не случилось!");
+  fat.weapon = "spear"; await say("narr", "Толстяк взял копьё.");
+  await moveTo(G, AC.x - 5.4, AC.y + 5.9, 220); G.weapon = "sword";
+  await say("narr", "Горилан подбежал и взял самурайский меч!");
+  await moveTo(G, AC.x - 0.5, AC.y + 1, 220); G.dir = 1; fat.swing = true;
+  await say("narr", "Толстяк из-за своего жира ничего не мог сделать. Он бил по воздуху, но никак не мог достать Горилана.");
+  await hit(G, fat); fat.swing = false; fat.lying = true; fat.weapon = null;
+  hole = { x: fat.x, y: fat.y }; big("БАБАХ!"); camShake = 16;
+  await say("narr", "Толстяк с грохотом повалился и сделал гигантскую дырку в полу!");
+  await vanish(fat);
+  clapT = 4; await say("roma", "Люди вокруг начали хлопать. Я тоже начал хлопать!");
+  G.weapon = null;
+  await moveTo(R, AC.x - 3, AC.y + 1, 140); R.dir = 1; G.dir = -1;
+  await say("roma", "Вау, ты так круто дерёшься! А почему ты испугался этого маленького муравья?");
+  await say("gorilan", "Когда-то давно я убежал от мамы из своего дома. Все жители нашей деревни бежали из своих домов из-за этих муравьёв.");
+  await say("gorilan", "Это пустынный муравей. Он так сильно кусается, что все убегают из домов.");
+  await say("gorilan", "А когда они влюбляются в какое-то дерево, то залезают на него и собирают листья, чтобы выращивать грибы. Грибами кормят личинок. К такому дереву боятся даже подойти.");
+  await say("roma", "Ого! Ладно, нам надо быстрее отсюда убежать.");
+  await say("gorilan", "Побежали!");
+  focus = { x: AC.x * T, y: (AC.y + 9) * T };
+  await Promise.all([moveTo(R, AC.x - 0.6, AC.y + 10.4, 150), moveTo(G, AC.x + 0.8, AC.y + 10.2, 150)]);
+  await say("roma", "Тут железная дверь, а снизу между дверью и полом щель. Можно через неё пролезть!");
+  await say("gorilan", "Маленькая?! Она же гигантская!");
+  await Promise.all([moveTo(G, AC.x + 0.6, AC.y + 16, 150), wait(400).then(() => moveTo(R, AC.x - 0.6, AC.y + 16, 150))]);
+  stage = 2;
+  objective("Пролезь за ними через щель под <b>железной дверью</b> (юг арены)", AC.x, AC.y + 13);
+}
+
+async function scene3() {
+  focus = { x: AC.x * T, y: (AC.y + 16) * T };
+  await say("gorilan", "Я в микроволновке!");
+  await say("roma", "В какой микроволновке? Это же пустыня!");
+  await say("gorilan", "Но тут так жарко, как будто в микроволновке!");
+  await say("roma", "Может, в печке?");
+  await say("gorilan", "Ну да, да, в печке! Быстрее, иначе нас поймают!");
+  await say("narr", "Рядом была дорога. Они пошли по ней. Через пару часов им очень сильно захотелось пить...");
+  thirstOn = true; $("#water").style.display = "block";
+  moveTo(G, 100.6, 82, 80); moveTo(R, 99.4, 82.4, 80);
+  stage = 3;
+  objective("Иди по дороге на <b>юг</b> через пустыню. Жарко! Следи за водой 💧", 100, 84);
+}
+
+async function scene4() {
+  stop(G); stop(R);
+  place(G, 101.5, 85.6); place(R, 100.3, 86); G.dir = R.dir = 1; V.dir = V2.dir = -1;
+  focus = { x: 104 * T, y: 86 * T };
+  await say("narr", "Они увидели людей и машины. Это была маленькая деревня.");
+  await say("both", "Привет!");
+  await say("villager", "Конеоа еаещо хзщо!");
+  await say("villager2", "Эээ... Я русси не пониат. Не поймать.");
+  await say("gorilan", "Подожди... Я знаю этот язык! Это мой родной!");
+  await say("villager", "Хкуцущ жувр?");
+  await say("gorilan", "Они спрашивают, зачем мы сюда пришли.");
+  await say("roma", "Мы очень хотим пить! Есть ли у них вода?");
+  await say("gorilan", "Ооенгшщ пр!");
+  await say("gorilan", "У них есть целый источник! Он говорит: идёмте со мной.");
+  focus = { x: 107 * T, y: 88 * T };
+  await Promise.all([moveTo(V, 110.6, 89.6, 90), moveTo(G, 107.4, 88.6, 90), moveTo(R, 107.4, 89.8, 90), moveTo(player, 106.3, 89.2, 110)]);
+  G.dir = R.dir = player.dir = 1; V.dir = -1;
+  emoji("💧", 109 * T, 89 * T, 8, 40);
+  water = 100; thirstOn = false; $("#water").style.display = "none";
+  await say("roma", "Вода была очень холодная и вкусная!");
+  await say("gorilan", "Хох икуе!");
+  emoji("💵", V.x, V.y - 50, 3); V.jumpT = 2;
+  await say("narr", "Горилан дал дяденьке 100 долларов. Дяденька очень обрадовался: деревня была очень бедная — за целый день работы всего 5 копеек, а может, и меньше.");
+  await say("gorilan", "Кунжухан даева!");
+  await say("roma", "Что ты ему сказал?");
+  await say("gorilan", "Чтобы он отвёз нас до нашего города.");
+  focus = { x: 101 * T, y: 88 * T };
+  await Promise.all([moveTo(V, 103.6, 87.3, 110), moveTo(G, 102.4, 87.3, 110), moveTo(R, 102.4, 89.1, 110), moveTo(player, 104.5, 89.4, 110)]);
+  V.hidden = G.hidden = R.hidden = true;
+  const bc = mk("blackcar", 93, 82, { angle: 0.4 });
+  await say("gorilan", "Смотри, там какая-то машина...");
+  await say("roma", "Что-то она очень похожа...");
+  await say("gorilan", "Да, я её видел там, куда нас привезли! Когда мы вышли, там была эта машина. Значит, нас ищут!");
+  await say("roma", "Надо быстрее отсюда уезжать!");
+  await say("gorilan", "Кхэ фэтц зхжгс ооого омомо!");
+  await say("narr", "Ты тоже запрыгиваешь в машину!");
+  player.hidden = true;
+  await chase(bc);
+}
+
+async function chase(bc) {
+  focus = OC;
+  const drive = (async () => { await moveTo(OC, 46, 88.2, 330); await moveTo(OC, 46.2, 30, 330); await moveTo(OC, 41, 22.7, 300); })();
+  const follow = (async () => { await wait(900); await moveTo(bc, 100, 88.4, 300); await moveTo(bc, 6, 88.4, 350); bc.hidden = true; })();
+  await say("narr", "Вы едете на этой развалюхе по дороге далеко-далеко...");
+  await say("roma", "Смотри! За нами едет та машина!");
+  await say("gorilan", "Ооио хоно овоко тото!");
+  await drive;
+  await say("narr", "И вдруг мы резко завернули... Потом завернули за угол, потом снова завернули — и мы были на нашей улице Алексеевке!");
+  place(G, 42, 21.3); place(R, 40.2, 21.4); place(player, 38.2, 22.6);
+  G.dir = -1; R.dir = 1;
+  await say("roma", "Мы дома!");
+  stage = 5; objective("Приключение закончилось. Гуляй по миру!", null);
+  $("#end").style.display = "flex";
+  follow.catch(() => {});
+}
+
+// ============ Обновление ============
+function update(dt) {
+  time += dt;
+  if (!busy && !dlg.open) {
+    let vx = 0, vy = 0;
+    if (keys["arrowleft"] || keys["a"] || keys["ф"]) vx -= 1;
+    if (keys["arrowright"] || keys["d"] || keys["в"]) vx += 1;
+    if (keys["arrowup"] || keys["w"] || keys["ц"]) vy -= 1;
+    if (keys["arrowdown"] || keys["s"] || keys["ы"]) vy += 1;
+    if (stick.on) { const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.hypot(dx, dy); if (d > 8) { vx = dx / Math.max(d, 50); vy = dy / Math.max(d, 50); } }
+    const len = Math.hypot(vx, vy);
+    if (len > 1) { vx /= len; vy /= len; }
+    const speed = 175 * (thirstOn && water <= 0 ? 0.45 : 1);
+    const nx = player.x + vx * speed * dt, ny = player.y + vy * speed * dt;
+    const free = (x, y) => !isSolid(Math.floor((x - 9) / T), Math.floor((y - 6) / T)) && !isSolid(Math.floor((x + 9) / T), Math.floor((y - 6) / T)) &&
+                           !isSolid(Math.floor((x - 9) / T), Math.floor((y + 1) / T)) && !isSolid(Math.floor((x + 9) / T), Math.floor((y + 1) / T));
+    if (free(nx, player.y)) player.x = nx;
+    if (free(player.x, ny)) player.y = ny;
+    player.moving = len > 0.1;
+    if (Math.abs(vx) > 0.1) player.dir = Math.sign(vx);
+    if (player.moving) player.phase += dt * 12;
+  }
+  for (const a of actors) {
+    if (a.target) {
+      const dx = a.target.x - a.x, dy = a.target.y - a.y, d = Math.hypot(dx, dy), step = a.speed * dt;
+      if (Math.abs(dx) > 1) a.dir = Math.sign(dx);
+      if (d > 0.5) a.angle = Math.atan2(dy, dx);
+      if (d <= step) { a.x = a.target.x; a.y = a.target.y; a.target = null; a.moving = false; const r = a.resolve; a.resolve = null; r && r(); }
+      else { a.x += (dx / d) * step; a.y += (dy / d) * step; a.moving = true; a.phase += dt * 12; }
+    } else if (a !== player) a.moving = false;
+    if (a.fading) a.alpha = Math.max(0, a.alpha - dt * 1.6);
+    if (a.shake > 0) a.shake -= dt;
+    if (a.jumpT > 0) a.jumpT -= dt;
+  }
+  if (clapT > 0) { clapT -= dt; if (Math.random() < 0.3) { const s = spectators[(Math.random() * spectators.length) | 0]; emoji("👏", s.x, s.y - 30); } }
+  for (let i = particles.length - 1; i >= 0; i--) { const p = particles[i]; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; if (p.life <= 0) particles.splice(i, 1); }
+  if (dlg.open && dlg.shown < dlg.full.length) { dlg.shown = Math.min(dlg.full.length, dlg.shown + dt * 45); $("#dialog .txt").textContent = dlg.full.slice(0, Math.floor(dlg.shown)); }
+
+  const f = focus || player;
+  cam.x += (f.x - cam.x) * Math.min(1, dt * 5); cam.y += (f.y - 20 - cam.y) * Math.min(1, dt * 5);
+  camShake = Math.max(0, camShake - dt * 30);
+
+  if (thirstOn && get(Math.floor(player.x / T), Math.floor(player.y / T)) === SAND) {
+    water = Math.max(0, water - dt * 5);
+    $("#water .fill").style.width = water + "%";
+    $("#water .fill").style.background = water < 25 ? "#e25a5a" : "#58b8e8";
+  }
+
+  if (!busy && running) {
+    const d = (x, y) => Math.hypot(player.x - x * T, player.y - y * T) / T;
+    if (stage === 0 && d(44.5, 21) < 7) run(scene1);
+    else if (stage === 1 && (d(AC.x - 12, AC.y) < 4 || d(AC.x, AC.y) < 11)) run(scene2);
+    else if (stage === 2 && player.y > (AC.y + 13) * T && Math.abs(player.x - AC.x * T) < 10 * T) run(scene3);
+    else if (stage === 3 && d(103, 86) < 8) run(scene4);
+  }
+}
+
+// ============ Рисование ============
+const TILE_COL = { [GRASS]: ["#4c9d50", "#4a974d"], [ROAD]: ["#5d5f6b", "#5a5c68"], [SAND]: ["#e2c07a", "#dcb972"], [STONE]: ["#8d8a99", "#86839a"],
+  [ARENA]: ["#d8b26a", "#d2ab62"], [PAVE]: ["#b9b4a8", "#b3aea2"], [WATER]: ["#2d6fb5", "#2b6aae"], [SPRING]: ["#58b8e8", "#58b8e8"], [WALL]: ["#4d4758", "#4d4758"] };
+function drawTile(t, x, y) {
+  const px = x * T, py = y * T, h = hash(x, y);
+  ctx.fillStyle = TILE_COL[t][h & 1]; ctx.fillRect(px, py, T + 0.5, T + 0.5);
+  if (t === GRASS) {
+    if (h % 11 === 0) { ctx.fillStyle = ["#f5e663", "#f58ab0", "#ffffff"][h % 3]; ctx.fillRect(px + (h % 20) + 4, py + ((h >> 5) % 20) + 4, 4, 4); }
+    else if (h % 5 === 0) { ctx.fillStyle = "#3f8744"; ctx.fillRect(px + (h % 24) + 3, py + ((h >> 4) % 22) + 5, 2, 6); }
+  } else if (t === SAND && h % 9 === 0) { ctx.fillStyle = "#c9a45f"; ctx.fillRect(px + (h % 22) + 4, py + ((h >> 3) % 22) + 4, 5, 2); }
+  else if (t === ROAD) {
+    if ((y === 22 || y === 88) && get(x, y - 1) === ROAD && get(x, y + 1) === ROAD && x % 2 === 0) { ctx.fillStyle = "#e9e3c0"; ctx.fillRect(px + 4, py + 14, 22, 3); }
+    if ((x === 100 || x === 46) && get(x - 1, y) === ROAD && get(x + 1, y) === ROAD && y % 2 === 0) { ctx.fillStyle = "#e9e3c0"; ctx.fillRect(px + 14, py + 4, 3, 22); }
+  } else if (t === PAVE) { ctx.strokeStyle = "#a7a296"; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, py + 0.5, T - 1, T - 1); }
+  else if (t === WATER || t === SPRING) {
+    ctx.strokeStyle = "rgba(255,255,255,.25)"; ctx.lineWidth = 2; const o = Math.sin(time * 2 + x + y) * 4;
+    if (h % 3 === 0) { ctx.beginPath(); ctx.moveTo(px + 6 + o, py + 16); ctx.quadraticCurveTo(px + 12 + o, py + 11, px + 18 + o, py + 16); ctx.stroke(); }
+  } else if (t === WALL) {
+    ctx.fillStyle = "#6a6377"; ctx.fillRect(px, py, T + 0.5, 9);
+    ctx.strokeStyle = "#3d3847"; ctx.lineWidth = 1; ctx.strokeRect(px + 0.5, py + 9.5, T / 2, 11); ctx.strokeRect(px + T / 2 + 0.5, py + 20.5, T / 2 - 1, 11);
+  }
+}
+
+function ell(x, y, rx, ry, c) { ctx.fillStyle = c; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); }
+function box(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+
+function drawObj(o) {
+  const { x, y } = o;
+  if (o.type === "tree") {
+    box(x - 4, y - 20, 8, 20, "#6b4a2b");
+    ell(x, y - 32, 18 + o.v * 4, 16 + o.v * 3, "#2f7a3a"); ell(x - 5, y - 37, 10, 8, "#3f9a4a");
+  } else if (o.type === "cactus") {
+    box(x - 4, y - 30, 8, 30, "#3e8f4a"); box(x - 13, y - 22, 6, 12, "#3e8f4a"); box(x - 13, y - 14, 10, 5, "#3e8f4a"); box(x + 7, y - 26, 6, 10, "#3e8f4a"); box(x + 3, y - 18, 10, 5, "#3e8f4a");
+  } else if (o.type === "house") {
+    const w = o.w * T, h = o.h * T;
+    box(x - w / 2, y - h * 0.62, w, h * 0.62, o.color);
+    ctx.fillStyle = o.roof; ctx.beginPath(); ctx.moveTo(x - w / 2 - 8, y - h * 0.6); ctx.lineTo(x - w / 2 + 12, y - h - 8); ctx.lineTo(x + w / 2 - 12, y - h - 8); ctx.lineTo(x + w / 2 + 8, y - h * 0.6); ctx.fill();
+    box(x - 11, y - 38, 22, 38, "#7a4e2e"); box(x + 6, y - 20, 3, 3, "#e8c15a");
+    box(x - w / 2 + 16, y - h * 0.5, 26, 22, "#8fd3f4"); box(x + w / 2 - 42, y - h * 0.5, 26, 22, "#8fd3f4");
+    box(x - w / 2 + 28, y - h * 0.5, 2, 22, "#fff"); box(x + w / 2 - 30, y - h * 0.5, 2, 22, "#fff");
+  } else if (o.type === "hut") {
+    box(x - 44, y - 50, 88, 50, "#c9955a"); box(x - 10, y - 30, 20, 30, "#5a3a1e");
+    ctx.fillStyle = "#e0c071"; ctx.beginPath(); ctx.moveTo(x - 54, y - 46); ctx.lineTo(x, y - 90); ctx.lineTo(x + 54, y - 46); ctx.fill();
+  } else if (o.type === "bench") {
+    box(x - 50, y - 14, 100, 6, "#8b5a2b"); box(x - 50, y - 26, 100, 5, "#9b6a3b"); box(x - 46, y - 8, 4, 8, "#444"); box(x + 42, y - 8, 4, 8, "#444");
+  } else if (o.type === "sign") {
+    box(x - 2, y - 30, 4, 30, "#6b4a2b");
+    ctx.font = "bold 12px system-ui"; const w = ctx.measureText(o.text).width + 12;
+    box(x - w / 2, y - 46, w, 18, "#d9b377"); ctx.strokeStyle = "#6b4a2b"; ctx.lineWidth = 2; ctx.strokeRect(x - w / 2, y - 46, w, 18);
+    ctx.fillStyle = "#3a2410"; ctx.textAlign = "center"; ctx.fillText(o.text, x, y - 33);
+  } else if (o.type === "rack") {
+    box(x - 30, y - 40, 4, 40, "#6b4a2b"); box(x + 26, y - 40, 4, 40, "#6b4a2b"); box(x - 30, y - 40, 60, 4, "#6b4a2b");
+    box(x - 20, y - 36, 3, 34, "#7a5a3a"); box(x - 26, y - 36, 15, 10, "#888");   // молот
+    box(x - 4, y - 36, 2, 34, "#dde"); box(x - 7, y - 8, 8, 3, "#553");            // меч
+    box(x + 12, y - 38, 2, 36, "#7a5a3a"); ctx.fillStyle = "#bbb"; ctx.beginPath(); ctx.moveTo(x + 13, y - 46); ctx.lineTo(x + 9, y - 36); ctx.lineTo(x + 17, y - 36); ctx.fill();
+  } else if (o.type === "door") {
+    box(x - 52, y - 40, 104, 22, "#3a3d46"); ctx.fillStyle = "#777";
+    for (let i = -44; i <= 44; i += 16) { ctx.beginPath(); ctx.arc(x + i, y - 29, 2.5, 0, 7); ctx.fill(); }
+  }
+}
+
+function drawWeapon(kind, swing) {
+  ctx.save(); ctx.rotate(swing ? Math.sin(time * 14) * 0.6 : -0.3);
+  if (kind === "hammer") { box(-1.5, -26, 3, 28, "#7a5a3a"); box(-10, -34, 20, 12, "#888"); }
+  if (kind === "sword") { box(-1, -34, 2, 32, "#e8ecf5"); box(-5, -3, 10, 3, "#553"); }
+  if (kind === "spear") { box(-1, -40, 2, 46, "#7a5a3a"); ctx.fillStyle = "#bbb"; ctx.beginPath(); ctx.moveTo(0, -50); ctx.lineTo(-4, -40); ctx.lineTo(4, -40); ctx.fill(); }
+  ctx.restore();
+}
+
+function drawPerson(a, s) {
+  const size = s.size || 1;
+  ctx.save(); ctx.translate(a.x + (a.shake > 0 || a.scared ? (Math.random() - 0.5) * 4 : 0), a.y);
+  ctx.globalAlpha = a.alpha;
+  ell(0, 0, 13 * size * (s.fat ? 1.6 : 1), 4, "rgba(0,0,0,.25)");
+  if (a.jumpT > 0) ctx.translate(0, -Math.abs(Math.sin(a.jumpT * 10)) * 10);
+  if (a.kind === "spect" && clapT > 0) ctx.translate(0, -Math.abs(Math.sin(time * 10 + a.phase)) * 4);
+  if (a.lying) { ctx.translate(0, -6); ctx.rotate(-Math.PI / 2); ctx.translate(0, 18 * size); }
+  ctx.scale(size * a.dir, size);
+  const L = a.sit ? 6 : 14, sw = a.moving ? Math.sin(a.phase) * 3 : 0;
+  const skin = s.fat && a.clean ? s.cleanSkin : s.skin, bw = s.bw, aw = s.aw;
+  if (s.pack) box(-bw / 2 - 6, -L - 15, 6, 13, "#8a5a2b");
+  if (s.robe) { box(-bw / 2, -L - 16, bw, L + 16, s.shirt); }
+  else {
+    box(-6, -L, 5, L - Math.max(0, sw), s.pants); box(1, -L, 5, L - Math.max(0, -sw), s.pants);
+    box(-7, -2 - Math.max(0, sw), 6, 3, "#222"); box(1, -2 - Math.max(0, -sw), 6, 3, "#222");
+    if (s.fat) { ell(0, -L - 12, bw / 2, 15, skin); box(-bw / 2 + 2, -L - 2, bw - 4, 6, s.pants);
+      if (a.clean) { ell(-6, -L - 14, 3, 2, "#6d4a2b"); ell(8, -L - 6, 4, 2, "#6d4a2b"); ell(2, -L - 20, 2, 2, "#6d4a2b"); } }
+    else box(-bw / 2, -L - 16, bw, 16, s.shirt);
+  }
+  box(-bw / 2 - aw, -L - 15 + sw * 0.5, aw, 13, skin); box(bw / 2, -L - 15 - sw * 0.5, aw, 13, skin);
+  if (s.shirt && !s.robe && !s.fat) { box(-bw / 2 - aw, -L - 16, aw, 5, s.shirt); box(bw / 2, -L - 16, aw, 5, s.shirt); }
+  const hy = -L - 24;
+  ell(0, hy, 8, 8.5, skin);
+  if (s.curly) { ctx.fillStyle = s.hair; for (let i = -6; i <= 6; i += 3) { ctx.beginPath(); ctx.arc(i, hy - 7, 3.2, 0, 7); ctx.fill(); } }
+  else if (s.wrap) { box(-9, hy - 10, 18, 6, s.wrap); }
+  else { ctx.fillStyle = s.hair; ctx.beginPath(); ctx.arc(0, hy - 1, 8.5, Math.PI, 0); ctx.fill(); box(-8.5, hy - 2, 4, 5, s.hair); }
+  if (s.hat) { box(-11, hy - 8, 22, 3, s.hat); box(-7, hy - 16, 14, 9, s.hat); }
+  box(1, hy - 1, 2, 2.5, "#111"); box(5, hy - 1, 2, 2.5, "#111");
+  if (s.mustache) box(1, hy + 3, 7, 2, "#5a4030");
+  else box(3, hy + 4, 3, 1.3, "#7a3a2a");
+  if (a.item === "candy") { ell(bw / 2 + aw / 2, -L - 2, 4, 3, "#ff5fa2"); }
+  if (a.weapon) { ctx.save(); ctx.translate(bw / 2 + aw / 2, -L - 3); drawWeapon(a.weapon, a.swing); ctx.restore(); }
+  ctx.restore();
+}
+
+function drawLion(a) {
+  ctx.save(); ctx.translate(a.x + (a.shake > 0 ? (Math.random() - 0.5) * 6 : 0), a.y); ctx.globalAlpha = a.alpha; ctx.scale(a.dir * 1.2, 1.2);
+  ell(0, 0, 24, 5, "rgba(0,0,0,.25)");
+  const sw = a.moving ? Math.sin(a.phase) * 3 : 0;
+  [-16, -8, 8, 16].forEach((lx, i) => box(lx - 3, -14, 6, 14 - (i % 2 ? sw : -sw) * 0.5, "#c8923a"));
+  ell(0, -18, 22, 10, "#d9a441");
+  ctx.strokeStyle = "#c8923a"; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(-20, -18); ctx.quadraticCurveTo(-34, -30, -30, -34); ctx.stroke(); ell(-30, -35, 4, 4, "#8a4b1c");
+  ell(18, -26, 13, 13, "#8a4b1c"); ell(21, -25, 8, 8, "#e0b050"); box(24, -28, 2, 2, "#111"); box(27, -22, 3, 2, "#5a2a1a");
+  ctx.restore();
+}
+function drawAnt(a) {
+  ctx.save(); ctx.translate(a.x + (a.shake > 0 ? (Math.random() - 0.5) * 6 : 0), a.y); ctx.globalAlpha = a.alpha; ctx.scale(a.dir * 1.3, 1.3);
+  ell(0, 0, 22, 4, "rgba(0,0,0,.25)");
+  ctx.strokeStyle = "#4a1508"; ctx.lineWidth = 2;
+  for (let i = -1; i <= 1; i++) { const w = a.moving ? Math.sin(a.phase + i) * 3 : 0; ctx.beginPath(); ctx.moveTo(i * 4, -12); ctx.lineTo(i * 8 - 4 + w, -2); ctx.lineTo(i * 9 - 6 + w, 0); ctx.stroke(); }
+  ell(-14, -13, 11, 8, "#8b2a14"); ell(0, -13, 6, 5, "#9b3a1c"); ell(12, -15, 7, 6, "#8b2a14");
+  ctx.beginPath(); ctx.moveTo(14, -20); ctx.quadraticCurveTo(18, -32, 24, -30); ctx.moveTo(12, -20); ctx.quadraticCurveTo(12, -34, 18, -34); ctx.stroke();
+  box(15, -17, 2, 2, "#fff"); ctx.beginPath(); ctx.moveTo(18, -12); ctx.lineTo(23, -9); ctx.stroke();
+  ctx.restore();
+}
+function drawCar(a) {
+  ctx.save(); ctx.translate(a.x, a.y); ctx.rotate(a.angle || 0);
+  ell(2, 4, 40, 20, "rgba(0,0,0,.25)");
+  [[-22, -19], [18, -19], [-22, 14], [18, 14]].forEach(([x, y]) => box(x, y, 12, 5, "#111"));
+  const old = a.kind === "oldcar";
+  ctx.fillStyle = old ? "#9c7a54" : "#1d1d24"; ctx.beginPath(); ctx.roundRect(-36, -16, 72, 32, 8); ctx.fill();
+  box(6, -12, 12, 24, old ? "#3a4a5a" : "#2a2f3f"); box(-24, -12, 8, 24, old ? "#3a4a5a" : "#2a2f3f");
+  box(-14, -13, 20, 26, old ? "#8a6a48" : "#15151b");
+  box(33, -13, 3, 6, "#ffe38a"); box(33, 7, 3, 6, "#ffe38a");
+  if (old) { ell(-26, 8, 5, 4, "#7a4a2a"); ell(20, -9, 4, 3, "#7a4a2a"); ell(-4, 11, 3, 2, "#6a3a1a"); }
+  ctx.restore();
+}
+function drawActor(a) {
+  if (a.hidden) return;
+  if (a.kind === "lion") drawLion(a);
+  else if (a.kind === "ant") drawAnt(a);
+  else if (a.kind === "oldcar" || a.kind === "blackcar") drawCar(a);
+  else drawPerson(a, a.sty || STY[a.kind]);
+}
+
+function draw() {
+  ctx.fillStyle = "#1b3f6e"; ctx.fillRect(0, 0, VW, VH);
+  const vw = VW / Z, vh = VH / Z;
+  const sx = (Math.random() - 0.5) * camShake, sy = (Math.random() - 0.5) * camShake;
+  const cx = Math.max(vw / 2, Math.min(W * T - vw / 2, cam.x)), cy = Math.max(vh / 2, Math.min(H * T - vh / 2, cam.y));
+  const ox = cx - vw / 2, oy = cy - vh / 2;
+  ctx.save(); ctx.scale(Z, Z); ctx.translate(-ox + sx, -oy + sy);
+  const x0 = Math.max(0, Math.floor(ox / T)), x1 = Math.min(W - 1, Math.ceil((ox + vw) / T)), y0 = Math.max(0, Math.floor(oy / T)), y1 = Math.min(H - 1, Math.ceil((oy + vh) / T));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) drawTile(map[at(x, y)], x, y);
+  if (hole) { ell(hole.x, hole.y - 4, 44, 16, "#1a1208"); ell(hole.x, hole.y - 6, 36, 11, "#000"); }
+
+  const inView = (o) => o.x > ox - 120 && o.x < ox + vw + 120 && o.y > oy - 40 && o.y < oy + vh + 140;
+  const list = [...objs.filter(inView).map((o) => ({ y: o.y, d: () => drawObj(o) })),
+                ...actors.filter((a) => !a.hidden && inView(a)).map((a) => ({ y: a.y, d: () => drawActor(a) })),
+                ...spectators.filter(inView).map((a) => ({ y: a.y, d: () => drawPerson(a, a.sty) }))];
+  list.sort((a, b) => a.y - b.y).forEach((o) => o.d());
+
+  ctx.font = "bold 12px system-ui"; ctx.textAlign = "center";
+  for (const a of [G, R, V, V2, ...actors.filter((a) => a.kind === "tolya")]) {
+    if (a.hidden || a.lying || Math.hypot(a.x - player.x, a.y - player.y) > 6 * T) continue;
+    const top = a.y - ((STY[a.kind].size || 1) * (a.sit ? 42 : 50)) - 10;
+    ctx.fillStyle = "rgba(0,0,0,.5)"; const w = ctx.measureText(NAMES[a.kind]).width + 10; ctx.fillRect(a.x - w / 2, top - 12, w, 16);
+    ctx.fillStyle = "#fff"; ctx.fillText(NAMES[a.kind], a.x, top);
+  }
+  for (const a of speakers) {
+    if (a.hidden) continue;
+    const top = a.y - ((STY[a.kind]?.size || 1) * (a.sit ? 42 : 50)) - 30 + Math.sin(time * 6) * 3;
+    ctx.fillStyle = "#ffcf6b"; ctx.beginPath(); ctx.moveTo(a.x - 7, top); ctx.lineTo(a.x + 7, top); ctx.lineTo(a.x, top + 9); ctx.fill();
+  }
+  ctx.font = "22px system-ui";
+  for (const p of particles) { ctx.globalAlpha = Math.min(1, p.life); ctx.fillText(p.ch, p.x, p.y); }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (running && obj && !busy) drawArrow(obj.x, obj.y, ox, oy, vw, vh);
+  if (thirstOn && get(Math.floor(player.x / T), Math.floor(player.y / T)) === SAND) {
+    ctx.fillStyle = `rgba(255,140,40,${0.08 + (1 - water / 100) * 0.12})`; ctx.fillRect(0, 0, VW, VH);
+  }
+  if (stick.on && !busy) {
+    ctx.strokeStyle = "rgba(255,255,255,.4)"; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(stick.ox, stick.oy, 50, 0, 7); ctx.stroke();
+    const dx = stick.x - stick.ox, dy = stick.y - stick.oy, d = Math.min(50, Math.hypot(dx, dy)), an = Math.atan2(dy, dx);
+    ctx.fillStyle = "rgba(255,255,255,.5)"; ctx.beginPath(); ctx.arc(stick.ox + Math.cos(an) * d, stick.oy + Math.sin(an) * d, 20, 0, 7); ctx.fill();
+  }
+  drawMini();
+}
+
+function drawArrow(wx, wy, ox, oy, vw, vh) {
+  const sx = (wx - ox) * Z, sy = (wy - oy) * Z, m = 40;
+  ctx.fillStyle = "#ffcf6b"; ctx.strokeStyle = "#1a1a2e"; ctx.lineWidth = 2;
+  if (sx > m && sx < VW - m && sy > m + 60 && sy < VH - m) {
+    const y = sy - 60 + Math.sin(time * 5) * 6;
+    ctx.beginPath(); ctx.moveTo(sx - 12, y); ctx.lineTo(sx + 12, y); ctx.lineTo(sx, y + 16); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    const cx = VW / 2, cy = VH / 2, an = Math.atan2(sy - cy, sx - cx);
+    const k = Math.min((VW / 2 - m) / Math.abs(Math.cos(an) || 1e-6), (VH / 2 - m) / Math.abs(Math.sin(an) || 1e-6));
+    ctx.save(); ctx.translate(cx + Math.cos(an) * k, cy + Math.sin(an) * k); ctx.rotate(an);
+    ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -13); ctx.lineTo(-4, 0); ctx.lineTo(-10, 13); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
+  }
+}
+
+const miniBase = document.createElement("canvas"); miniBase.width = W; miniBase.height = H;
+{ const m = miniBase.getContext("2d"), img = m.createImageData(W, H);
+  const C = { [WATER]: [45, 111, 181], [GRASS]: [76, 157, 80], [ROAD]: [93, 95, 107], [SAND]: [226, 192, 122], [STONE]: [141, 138, 153], [ARENA]: [216, 178, 106], [WALL]: [77, 71, 88], [PAVE]: [185, 180, 168], [SPRING]: [88, 184, 232] };
+  for (let i = 0; i < W * H; i++) { const c = solidObj[i] ? (map[i] === SAND ? [62, 143, 74] : [47, 122, 58]) : C[map[i]]; img.data.set([...c, 255], i * 4); }
+  m.putImageData(img, 0, 0); }
+const mini = document.getElementById("mini").getContext("2d");
+function drawMini() {
+  mini.drawImage(miniBase, 0, 0);
+  const dot = (x, y, c, r = 2) => { mini.fillStyle = c; mini.fillRect(x / T - r, y / T - r, r * 2, r * 2); };
+  if (obj && Math.sin(time * 6) > 0) dot(obj.x, obj.y, "#ffcf6b", 3);
+  for (const a of [G, R]) if (!a.hidden) dot(a.x, a.y, "#ff8a3d");
+  if (!OC.hidden && player.hidden) dot(OC.x, OC.y, "#e2553f", 3);
+  if (!player.hidden) dot(player.x, player.y, "#ffffff", 2.5);
+}
+
+// ============ Запуск ============
+objective("Иди по дороге на <b>восток</b> — в город Алексеевку", 44.5, 20.5);
+document.getElementById("play").onclick = () => { $("#start").style.display = "none"; running = true; };
+document.getElementById("roam").onclick = () => { $("#end").style.display = "none"; };
+let last = performance.now();
+function loop(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; if (running) update(dt); draw(); requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
