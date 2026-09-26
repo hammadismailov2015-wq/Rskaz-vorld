@@ -238,7 +238,7 @@ const CHAR = {
   villager2: { skin: "#a8744a", shirt: "#c9d6a3", trim: "#3c7dc4", build: "thin", robe: true, hair: wrap("#3c7dc4", false), blush: 0.15,
     brows: "M74 70 q9 -8 19 -2 M107 68 q10 -4 19 4",
     mouth: `<ellipse cx="100" cy="111" rx="7" ry="6" fill="#8a2a2a" stroke="${OUT}" stroke-width="2.5"/>` },
-  player: { skin: "#f0c8a0", shirt: "#2e9e6b", pants: "#3a3a48", shoes: "#6b4a2b", build: "normal", hair: hairMessy("#5a3620"), iris: "#3a6a3a", logo: "🎒" },
+  player: { skin: "#f0c8a0", shirt: "#f08a3c", pants: "#3a3a48", shoes: "#6b4a2b", build: "normal", hair: hairMessy("#5a3620"), iris: "#3a6a3a", logo: "🎒" },
 };
 
 // ---------- Книга 2 ----------
